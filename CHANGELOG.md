@@ -101,6 +101,9 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
 - GitHub Actions CI with three tiers that do not pretend to be each other:
   code compatibility, browser integration, and OS-specific server discovery.
 - `docs/PLATFORM_SUPPORT.md` (Verified/Expected/Untested/Unsupported per
-  feature) and `docs/NAMING.md` (the unresolved naming blocker).
+  feature) and `docs/NAMING.md` (name availability research).
 
-[Unreleased]: https://github.com/marcushatz/localhostfix/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/marcushatz/localhostfix/commits/main
+
+<!-- Once v0.1.0 is tagged, change the link above to:
+     https://github.com/marcushatz/localhostfix/compare/v0.1.0...HEAD -->

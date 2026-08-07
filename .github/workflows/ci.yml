@@ -79,10 +79,9 @@ jobs:
   # identity works on an OS, because it spawns real processes with explicit
   # working directories and asserts they are attributed correctly.
   #
-  # macOS is the reference implementation. Linux runs in continue-on-error
-  # until the /proc path has been verified in practice; a failure here must
-  # not be read as "Linux is supported" or block the merge queue while the
-  # implementation is still labelled Expected in docs/PLATFORM_SUPPORT.md.
+  # Both macOS and Linux are enforced: the /proc implementation has passed
+  # here consistently, so docs/PLATFORM_SUPPORT.md lists Linux as Verified and
+  # a regression on either OS must fail the build rather than be advisory.
   discovery:
     name: Server discovery (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -94,7 +93,7 @@ jobs:
           - os: macos-latest
             experimental: false
           - os: ubuntu-latest
-            experimental: true
+            experimental: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

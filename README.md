@@ -1,14 +1,26 @@
 # LocalhostFix
 
+[![CI](https://github.com/marcushatz/localhostfix/actions/workflows/ci.yml/badge.svg)](https://github.com/marcushatz/localhostfix/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)
+![Platforms](https://img.shields.io/badge/verified-macOS%20%7C%20Linux-lightgrey)
+
 **When Claude Code can't properly see your localhost frontend, run one command.**
 
-LocalhostFix checks the path from your project to the rendered browser, fixes common setup failures, diagnoses application failures, and verifies that the real frontend is visible again.
-
 ```bash
-npx localhostfix fix
+localhostfix fix
 ```
 
-> Status: 0.1 release candidate. macOS is the only verified platform. Nothing is published yet.
+LocalhostFix walks the path from your project to the rendered browser. It:
+
+- **fixes** common localhost, dev-server, and browser setup failures
+- **diagnoses** application failures instead of pretending the page worked
+- **verifies** the frontend actually renders before reporting success
+- **refuses** to inspect a different project that happens to answer on your port
+
+> ⚠️ **Not on npm yet.** `npx localhostfix` does not work today — see
+> [Installation](#installation) to run it from source. Status: 0.1 release
+> candidate, verified on macOS and Linux.
 
 ## The problem
 
@@ -26,14 +38,12 @@ The failure is almost never "Playwright is broken." It is one specific link in a
 
 LocalhostFix walks that chain in order, repairs the parts it can repair safely, and tells you exactly which link failed when it can't.
 
-## What `fix` actually does
+## The core flow
 
-It runs the same discovery and diagnosis as `doctor` and `inspect` — there is no second opinion — applies only repairs it can make confidently, then **re-inspects to confirm**. A browser launching is not treated as success.
-
-**A repairable problem:**
+**Something is repairable** — it fixes it, then re-inspects to prove it worked:
 
 ```
-$ npx localhostfix fix
+$ localhostfix fix
 
   FIXED
 
@@ -46,10 +56,10 @@ $ npx localhostfix fix
   Frontend inspection restored.
 ```
 
-**An application problem — LocalhostFix stops and hands over evidence:**
+**The problem is your code** — it stops, changes nothing, and hands over evidence:
 
 ```
-$ npx localhostfix fix
+$ localhostfix fix
 
   APPLICATION_FIX_REQUIRED
 
@@ -65,10 +75,10 @@ $ npx localhostfix fix
     localhostfix inspect
 ```
 
-**Something it will not do blindly:**
+**It won't act blindly** — installing software is your call:
 
 ```
-$ npx localhostfix fix
+$ localhostfix fix
 
   COULD_NOT_REPAIR
 
@@ -79,6 +89,8 @@ $ npx localhostfix fix
 
   Or re-run with --yes to let LocalhostFix do it.
 ```
+
+Outcomes are `ALREADY_HEALTHY`, `FIXED`, `APPLICATION_FIX_REQUIRED`, or `COULD_NOT_REPAIR`, with exit codes 0, 0, 1, and 2. **`FIXED` is reported only when a fresh inspection after the repair actually rendered the application.**
 
 ### What it repairs, and what it only diagnoses
 
@@ -91,21 +103,19 @@ $ npx localhostfix fix
 | A stale inspection lock from a crashed run | A missing dev command |
 | A missing Chromium build — **only with `--yes`** | A configured URL that isn't localhost |
 
-Outcomes are `ALREADY_HEALTHY`, `FIXED`, `APPLICATION_FIX_REQUIRED`, or `COULD_NOT_REPAIR`, with exit codes 0, 0, 1, and 2. **`FIXED` is reported only when a fresh inspection after the repair actually rendered the application.**
-
 LocalhostFix will not rewrite your source code, signal a process it didn't start, delete browser profiles, bypass authentication, touch global shell configuration, use `sudo`, or disable a privacy guard to make a run succeed.
 
 ## What this is, and is not
 
 LocalhostFix is a reliability and diagnosis layer **around** Playwright, not a replacement for it and not a browser-automation framework. No API key is needed; every check is deterministic and works offline.
 
-Honest framing of what it does:
+Fair to say:
 
 - It fixes common **setup** failures and diagnoses the rest with evidence.
 - It verifies the frontend actually renders before reporting success.
 - It tells you whether a failure is yours or the environment's.
 
-What it does **not** claim:
+Not true, and never claimed:
 
 - It does not fix Playwright itself, and does not patch it.
 - It does not mean Playwright will never break again.
@@ -115,23 +125,77 @@ What it does **not** claim:
 - It does not detect, configure, or validate Playwright MCP — that is not implemented.
 - It cannot verify which project owns a port where OS process inspection is unavailable, including on Windows; it reports that as unknown rather than guessing.
 
-## Installation
+## How it works
 
-Requires **Node.js 22+** and a Chromium build for Playwright.
-
-```bash
-# not yet published to npm — from a local clone:
-npm install && npm run build && npm link
-
-# then, in your project:
-localhostfix setup
+```
+project config → server identity → dev server → network → browser
+   → navigation → application → data/API → rendered interface
 ```
 
-If Chromium is missing, LocalhostFix tells you and does not download it behind your back:
+Each verdict is attributed to one layer, and the report's `domain` field says whether it is a **setup** problem (fix the environment) or an **application** problem (fix your code).
+
+Blank-page detection is multi-signal and deliberately conservative — DOM text and element counts, empty app roots, page errors, failed requests, screenshot uniformity, loading indicators, framework error overlays. It reports `true`, `false`, or `uncertain` with confidence and reasons, because an intentionally minimal page looks a lot like a broken one.
+
+<details>
+<summary><strong>Server identity — why a reachable URL isn't enough</strong></summary>
+
+A reachable URL is not evidence that it belongs to *your* project. Framework default ports collide constantly, and during development this tool once returned a confident `HEALTHY_RENDER` for a completely different application that happened to own port 3000.
+
+LocalhostFix establishes identity from the listening process itself — its working directory first, its command line second — so it finds your project's server on whatever port it actually landed on, and refuses to inspect a neighbour's:
+
+```
+  Port ownership
+  ✗ Port 3000 belongs to a different project:
+      /Users/example/project-b
+
+  Detected project server
+  ✓ Current project is listening on:
+      http://localhost:3005
+  ✓ Chosen because: matches the configured framework dev command
+```
+
+</details>
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design and the research behind it.
+
+## Installation
+
+Requires **Node.js 22+**.
+
+**Not published to npm yet.** Install from source:
+
+```bash
+git clone https://github.com/marcushatz/localhostfix.git
+cd localhostfix
+npm install
+npm run build
+npm link          # puts `localhostfix` on your PATH
+```
+
+Then, in the project you want to inspect:
+
+```bash
+localhostfix fix
+```
+
+You also need a Chromium build for Playwright. LocalhostFix tells you if it's missing and won't download it behind your back:
 
 ```bash
 npx playwright install chromium
 ```
+
+<details>
+<summary>After npm publication (not yet available)</summary>
+
+Once `localhostfix` is published, no install step will be needed:
+
+```bash
+npx localhostfix fix
+```
+
+This does **not** work today. Until then, use the source install above.
+
+</details>
 
 ## Quick start
 
@@ -160,7 +224,7 @@ Artifacts land in `.localhostfix/latest/` (and a timestamped directory under `.l
 
 Useful flags: `--headed` (visible browser), `--json` (machine-readable output), `--url` (explicit URL, which also resolves ambiguity), `--yes` (approve installing Chromium), `--allow-remote` (permit non-localhost — see [Privacy](docs/PRIVACY.md)), `--allow-foreign-server` (deliberately accept a server belonging to another project).
 
-## Exit codes
+### Exit codes
 
 | Code | Meaning |
 |---|---|
@@ -170,7 +234,7 @@ Useful flags: `--headed` (visible browser), `--json` (machine-readable output), 
 | `3` | Indeterminate |
 | `4` | CLI usage error |
 
-## Artifacts
+### Artifacts
 
 ```
 .localhostfix/
@@ -197,45 +261,15 @@ So one task that touches twenty components produces one inspection, not twenty. 
 
 Hooks go to `.claude/settings.local.json` by default — personal and git-ignored — so installing LocalhostFix never imposes a browser-launching hook on everyone who clones your repo. Existing settings are merged, never overwritten, and backed up first.
 
-## How it works
-
-```
-project config → server identity → dev server → network → browser
-   → navigation → application → data/API → rendered interface
-```
-
-Each verdict is attributed to one layer, and the report's `domain` field says whether it is a **setup** problem (fix the environment) or an **application** problem (fix your code).
-
-### Server identity: a robustness detail worth knowing
-
-A reachable URL is not evidence that it belongs to *your* project. Framework default ports collide constantly, and during development this tool once returned a confident `HEALTHY_RENDER` for a completely different application that happened to own port 3000.
-
-LocalhostFix establishes identity from the listening process itself — its working directory first, its command line second — so it finds your project's server on whatever port it actually landed on, and refuses to inspect a neighbour's:
-
-```
-  Port ownership
-  ✗ Port 3000 belongs to a different project:
-      /Users/example/project-b
-
-  Detected project server
-  ✓ Current project is listening on:
-      http://localhost:3005
-  ✓ Chosen because: matches the configured framework dev command
-```
-
-Blank-page detection is multi-signal and deliberately conservative — DOM text and element counts, empty app roots, page errors, failed requests, screenshot uniformity, loading indicators, framework error overlays. It reports `true`, `false`, or `uncertain` with confidence and reasons, because an intentionally minimal page looks a lot like a broken one.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and the research behind it.
-
 ## Supported environments
 
-Support labels are used strictly. "The unit tests pass on that OS" is not support — see [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md).
+Support labels are used strictly: passing typecheck, build, and unit tests on an OS is **not** support. Every "Verified" below is backed by a specific CI job — see [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md) for the per-feature matrix and the evidence.
 
 | | Status |
 |---|---|
-| macOS | **Verified** — the full suite runs here |
-| Linux | **Expected** — implemented via `/proc` with an `lsof` fallback, parsers unit-tested against captured output, never run on a Linux host |
-| Windows | **Server identity unsupported.** No `lsof` or `/proc`; ownership is reported as unknown rather than approximated. The rest is untested |
+| macOS | **Verified** — full suite runs in CI and locally |
+| Linux | **Verified** — integration and server-discovery suites pass on `ubuntu-latest` with real Chromium. Watch mode remains unverified |
+| Windows | **Server identity unsupported.** No `lsof` or `/proc`, and no process-group termination; ownership is reported as unknown rather than approximated. Code compiles and unit tests pass, which is not the same as working |
 | Next.js, Vite | Supported adapters |
 | Other Node projects | Generic adapter via a configured dev command |
 | Chromium | Supported |
@@ -249,7 +283,7 @@ No telemetry, no network calls, nothing transmitted. The only requests Localhost
 
 ## Known limitations
 
-- **macOS is the only verified platform.** Linux is implemented but unverified; Windows cannot verify server identity at all.
+- **Windows cannot verify server identity at all**, and the rest of it is untested there.
 - **Rendered is not correct.** `HEALTHY_RENDER` means the page rendered. Judging whether it *looks right* still requires looking at the screenshots.
 - **Blank detection is a heuristic**, tuned to avoid false alarms; it reports `uncertain` rather than guessing.
 - **Visible-text counts exclude scroll-reveal content** that starts at `opacity: 0`.
@@ -260,7 +294,7 @@ No telemetry, no network calls, nothing transmitted. The only requests Localhost
 
 ## Troubleshooting
 
-**Start with `localhostfix fix`.** Most of the cases below are what it exists to handle.
+**Start with `localhostfix fix`.** Most cases below are what it exists to handle.
 
 **"Chromium executable unavailable"** — run `npx playwright install chromium`, or `localhostfix fix --yes`.
 
@@ -274,7 +308,18 @@ No telemetry, no network calls, nothing transmitted. The only requests Localhost
 
 **Hooks are not firing** — run `localhostfix doctor` to confirm the skill and hook are installed and `autoInspect` is not `off`.
 
-**You see a `.agentview/` directory** — that is from the previous name of this tool, before it was released. Move it with `mv .agentview .localhostfix`, or delete it. Nothing reads it.
+## Documentation
+
+| Document | What's in it |
+|---|---|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Design, the Playwright research behind it, and why the core doesn't depend on MCP |
+| [PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md) | Per-feature support matrix with the CI evidence for each claim |
+| [PRIVACY.md](docs/PRIVACY.md) | What is captured, what is redacted, what never leaves your machine |
+| [SECURITY.md](docs/SECURITY.md) | Threat model and the things LocalhostFix refuses to do |
+| [DOGFOOD_REPORT.md](docs/DOGFOOD_REPORT.md) | Real runs against a real project, including the bugs dogfooding found |
+| [PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) | What it promises and, explicitly, what it does not |
+| [NAMING.md](docs/NAMING.md) | Availability research behind the name |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
 
 ## Development
 

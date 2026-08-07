@@ -6,25 +6,47 @@ These are used strictly. "It compiles" and "the unit tests pass" are **not** sup
 
 | Label | Meaning |
 |---|---|
-| **Verified** | Exercised on this OS by the integration suite or by hand, with the result checked |
-| **Expected** | Implemented deliberately for this OS, with unit coverage of its parsing logic, but **never run on that OS** |
+| **Verified** | Exercised on this OS by the integration suite in CI or by hand, with the result checked |
+| **Expected** | Implemented deliberately for this OS, with unit coverage of its logic, but **never exercised end to end on that OS** |
 | **Untested** | Should work in principle; nobody has confirmed it and there is no targeted coverage |
 | **Unsupported** | Known not to work; LocalhostFix reports the limitation rather than guessing |
 
-Only macOS is Verified for v0.1.
+**macOS and Linux are Verified for v0.1. Windows is not.**
+
+A row is only Verified where a CI job actually ran that behaviour on that OS.
+Passing typecheck, build, and unit tests is explicitly **not** enough — those
+run on Windows too, and Windows still cannot verify server identity at all.
 
 ## Support matrix
 
 | Feature | macOS | Linux | Windows |
 |---|---|---|---|
-| Project detection (framework, package manager, dev command) | Verified | Expected | Expected |
-| Server discovery (finding the project's server on any port) | Verified | Expected | **Unsupported** |
-| Process ownership (proving a server belongs to this project) | Verified | Expected | **Unsupported** |
-| Browser inspection (Chromium launch, navigation) | Verified | Expected | Untested |
-| Screenshots (desktop + mobile) | Verified | Expected | Untested |
-| Claude integration (skill + hooks) | Verified | Expected | Expected |
+| Project detection (framework, package manager, dev command) | Verified | **Verified** | Expected |
+| Server discovery (finding the project's server on any port) | Verified | **Verified** | **Unsupported** |
+| Process ownership (proving a server belongs to this project) | Verified | **Verified** | **Unsupported** |
+| Browser inspection (Chromium launch, navigation) | Verified | **Verified** | Untested |
+| Screenshots (desktop + mobile) | Verified | **Verified** | Untested |
+| Claude integration (skill + hooks) | Verified | **Verified** | Expected |
+| Safe cleanup (stopping only servers LocalhostFix started) | Verified | **Verified** | Degraded |
 | Watch mode | Verified | Expected | Untested |
-| Safe cleanup (stopping only servers LocalhostFix started) | Verified | Expected | Degraded |
+
+### The evidence behind each Linux "Verified"
+
+Every Linux row above is backed by a specific CI job on `ubuntu-latest`, with a
+real Chromium install, not by inference from the macOS result:
+
+| Row | Evidence |
+|---|---|
+| Project detection | `Integration (ubuntu-latest)` — fixture projects are detected and their dev commands run |
+| Server discovery, Process ownership | `Server discovery (ubuntu-latest)` — the wrong-project suite spawns real child processes with explicit working directories and asserts they are attributed correctly, including the foreign-project and cwd-`/` cases |
+| Browser inspection, Screenshots | `Integration (ubuntu-latest)` — real Chromium launches, and the test asserts `desktop.png` / `mobile.png` exist, exceed 1 kB, and carry a PNG header |
+| Claude integration | `Integration (ubuntu-latest)` — 14 tests covering skill install, settings merge, hook runtime, and loop prevention |
+| Safe cleanup | `Integration (ubuntu-latest)` — the process-hygiene test polls until a started server's port is released |
+
+**Watch mode remains Expected on Linux.** No integration test drives the file
+watcher on any OS; only `isFrontendFile` has unit coverage. It is marked
+Verified on macOS because it was exercised by hand, and that was not repeated
+on Linux.
 
 ## What is actually OS-specific
 
@@ -42,19 +64,32 @@ Adding a platform means implementing that interface. Nothing else needs to chang
 
 The reference platform. The full suite, including the wrong-project regression tests that spawn real child processes with explicit working directories, runs here. Requires `lsof` and `ps`, both present in a stock install.
 
-## Linux — Expected, not Verified
+## Linux — Verified in CI
 
 The Linux implementation reads `/proc` directly, so it needs no external binary — better than shelling out to `lsof`, which is frequently absent from containers and minimal images. Where `/proc` is unavailable or answers nothing useful, it falls back to `lsof`/`ps`.
 
-**What has coverage:** the parsers. `parseProcNetTcp` and `parsePpidFromStat` are unit-tested against captured real-world `/proc` output, including the cases that break naive implementations — listening sockets must be distinguished from established connections by state `0A`, and `/proc/<pid>/stat` must be parsed from the last `)` because the `comm` field can contain spaces and parentheses.
+Both `Integration (ubuntu-latest)` and `Server discovery (ubuntu-latest)` pass
+on every push, and the discovery job is enforced rather than advisory, so a
+Linux regression fails the build.
 
-**What has not been verified:** that the pieces work together on a live Linux host. Specifically unconfirmed:
+**What has coverage:** both the parsers and the end-to-end behaviour.
+`parseProcNetTcp` and `parsePpidFromStat` are unit-tested against captured
+real-world `/proc` output, including the cases that break naive
+implementations — listening sockets must be distinguished from established
+connections by state `0A`, and `/proc/<pid>/stat` must be parsed from the last
+`)` because the `comm` field can contain spaces and parentheses. On top of
+that, the full integration and wrong-project suites run on `ubuntu-latest`.
 
-- Whether scanning `/proc/*/fd` reliably maps socket inodes to PIDs at scale.
-- Behaviour inside containers, where `/proc` may be namespaced and a "port" may belong to a different network namespace entirely.
-- Whether the `lsof` fallback triggers correctly when `/proc` is partially restricted (hardened kernels, `hidepid`).
+**What is still unconfirmed on Linux**, and therefore not claimed:
 
-CI runs the discovery suite on Ubuntu with `continue-on-error: true`. That is a signal, not a promise: a green run there is evidence, and this table moves to Verified only when the suite passes on Linux consistently and someone has used it on a real project.
+- Behaviour inside containers, where `/proc` may be namespaced and a "port" may
+  belong to a different network namespace entirely. GitHub's Ubuntu runner is a
+  VM, not a container, so CI does not cover this.
+- Whether the `lsof` fallback triggers correctly when `/proc` is partially
+  restricted (hardened kernels, `hidepid`). CI has an unrestricted `/proc`, so
+  the fallback path is not exercised there.
+- Distributions other than the runner image. Nothing in the implementation is
+  Ubuntu-specific, but only Ubuntu has been run.
 
 ## Windows — Unsupported for server identity
 
