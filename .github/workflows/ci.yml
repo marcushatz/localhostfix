@@ -103,6 +103,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.os == 'macOS' && '~/Library/Caches/ms-playwright' || '~/.cache/ms-playwright' }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # Two of these tests assert a real HEALTHY_RENDER, so they need a
+      # browser as well as process inspection. Without this they fail with
+      # BROWSER_NOT_INSTALLED, which looks like a discovery failure but isn't.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Ensure lsof is present
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y lsof
