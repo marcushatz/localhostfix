@@ -135,8 +135,13 @@ Exit code `0`. Artifacts (copied into this repo as evidence):
 | Artifact | Path in this repo | Notes |
 |---|---|---|
 | Markdown report | `docs/dogfood-artifacts/healthy-report.md` | |
+| Desktop screenshot | not included | 1440×900, captured and reviewed |
+| Mobile screenshot | not included | 390×14895 full page, Pixel 7 emulation |
 
 Both screenshots were opened and confirmed to show the correct application.
+They are **not committed to this repository**: the dogfooding target was a
+private site, and the images showed its content. Everything they demonstrated
+is reproducible by running `localhostfix inspect` against any project.
 
 ### `localhostfix inspect /this-route-does-not-exist` — failure and diagnosis
 
