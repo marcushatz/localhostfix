@@ -21,7 +21,8 @@ import { nextAdapter, genericAdapter } from '../../src/frameworks/adapter.js';
  * never be weakened.
  */
 
-const TIMEOUT = 120_000;
+// Cold CI browser/dev-server startup budget; see vitest.config.ts.
+const TIMEOUT = 240_000;
 const cleanups: (() => void | Promise<void>)[] = [];
 
 afterEach(async () => {

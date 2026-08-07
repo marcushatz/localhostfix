@@ -19,7 +19,8 @@ import {
  * source, and never claim success without a verifying inspection.
  */
 
-const TIMEOUT = 180_000;
+// Two full inspections per test (repair, then verify), on a cold CI runner.
+const TIMEOUT = 300_000;
 const cleanups: (() => void | Promise<void>)[] = [];
 const fixtures: Fixture[] = [];
 

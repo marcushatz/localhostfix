@@ -16,8 +16,9 @@ import {
   type Fixture,
 } from '../fixtures/servers.js';
 
-/** Real servers + real Chromium: these are slow by nature. */
-const TIMEOUT = 120_000;
+// Real servers + real Chromium. Cold CI browser/dev-server startup budget;
+// see vitest.config.ts.
+const TIMEOUT = 240_000;
 
 const fixtures: Fixture[] = [];
 function fixture(name: string, source: string, extra?: { scripts?: Record<string, string> }): string {

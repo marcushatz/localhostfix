@@ -9,7 +9,8 @@ import { runInspection } from '../../src/inspect/run.js';
 import { InspectionReportSchema } from '../../src/artifacts/report-schema.js';
 import { HEALTHY_HANDLER, makeFixture, serverSource, type Fixture } from '../fixtures/servers.js';
 
-const TIMEOUT = 120_000;
+// Cold CI browser/dev-server startup budget; see vitest.config.ts.
+const TIMEOUT = 240_000;
 const fixtures: Fixture[] = [];
 function fixture(name: string, source: string): string {
   const f = makeFixture(name, source);

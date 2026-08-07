@@ -15,7 +15,8 @@ import { makeFixture, serverSource, type Fixture } from '../fixtures/servers.js'
  * them. A secret appearing anywhere in a run directory is a release blocker.
  */
 
-const TIMEOUT = 120_000;
+// Cold CI browser/dev-server startup budget; see vitest.config.ts.
+const TIMEOUT = 240_000;
 
 /** Distinctive so a match cannot be coincidental. */
 const SECRETS = {
