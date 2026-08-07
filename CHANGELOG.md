@@ -103,4 +103,4 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
 - `docs/PLATFORM_SUPPORT.md` (Verified/Expected/Untested/Unsupported per
   feature) and `docs/NAMING.md` (the unresolved naming blocker).
 
-[Unreleased]: https://example.invalid/compare
+[Unreleased]: https://github.com/marcushatz/localhostfix/compare/v0.1.0...HEAD
