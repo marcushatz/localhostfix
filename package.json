@@ -37,7 +37,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/OWNER/localhostfix.git"
+    "url": "https://github.com/marcushatz/localhostfix.git"
   },
   "private": true,
   "dependencies": {
