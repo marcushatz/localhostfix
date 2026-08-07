@@ -1,0 +1,58 @@
+{
+  "name": "@agentview/cli",
+  "version": "0.1.0",
+  "description": "AgentView verifies that your coding agent can inspect the frontend it is changing. It starts or finds the local dev server, opens the rendered app in Chromium, captures browser evidence, and explains which layer failed when inspection does not work.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "agentview": "./dist/cli/main.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "assets",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
+    "test:e2e": "vitest run test/e2e",
+    "lint": "eslint src test",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "cli",
+    "devtools",
+    "playwright",
+    "claude-code",
+    "coding-agents",
+    "frontend",
+    "screenshot",
+    "verification",
+    "localhost"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://example.invalid/placeholder-until-github-repo-created"
+  },
+  "private": true,
+  "dependencies": {
+    "commander": "^15.0.0",
+    "picocolors": "^1.1.1",
+    "playwright-core": "^1.62.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
