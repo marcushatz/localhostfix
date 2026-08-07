@@ -4,10 +4,8 @@
   "description": "Open-source CLI for when Claude Code or another coding agent cannot properly see your localhost frontend through Playwright. Fixes common setup failures, diagnoses application failures with evidence, and verifies that the real frontend renders again.",
   "type": "module",
   "license": "MIT",
-  "main": "./dist/index.js",
   "files": [
     "dist",
-    "assets",
     "README.md",
     "LICENSE"
   ],
