@@ -2,7 +2,8 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { probeUrl } from './probe.js';
-import { checkPortOwnership, portOf, type PortOwner } from './ownership.js';
+import { checkPortOwnership, portOf } from './ownership.js';
+import { processInspector, type PortOwner } from '../platform/index.js';
 import { describeSelection, discoverServers, type DiscoveryResult } from './discovery.js';
 import type { FrameworkAdapter } from '../frameworks/adapter.js';
 
@@ -186,19 +187,11 @@ export async function ensureServer(opts: StartOptions): Promise<StartResult> {
 
   const stop = async () => {
     if (child.pid && !exited) {
-      try {
-        process.kill(-child.pid, 'SIGTERM'); // negative pid → whole group
-      } catch {
-        /* already gone */
-      }
+      processInspector().killTree(child.pid, 'SIGTERM');
       const deadline = Date.now() + 5000;
       while (!exited && Date.now() < deadline) await sleep(100);
       if (!exited && child.pid) {
-        try {
-          process.kill(-child.pid, 'SIGKILL');
-        } catch {
-          /* already gone */
-        }
+        processInspector().killTree(child.pid, 'SIGKILL');
       }
     }
   };

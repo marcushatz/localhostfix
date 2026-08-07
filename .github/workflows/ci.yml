@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Tier 1: code compatibility ──────────────────────────────────────────
+  # Does the TypeScript compile and does pure logic behave, everywhere?
+  # Unit tests touch no browser, no servers, and no OS process inspection,
+  # so passing here says nothing about whether AgentView WORKS on that OS.
+  code:
+    name: Code (${{ matrix.os }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Unit tests
+        run: npm run test:unit
+
+  # ── Tier 2: browser and integration verification ────────────────────────
+  # Real dev servers, real Chromium. Linux and macOS only: these tests
+  # depend on POSIX process groups and process inspection.
+  integration:
+    name: Integration (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.os == 'macOS' && '~/Library/Caches/ms-playwright' || '~/.cache/ms-playwright' }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # --with-deps installs the system libraries Chromium needs on Linux.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # lsof is the fallback path for port ownership and is not installed on
+      # every GitHub runner image. Installing it exercises the same code path
+      # a developer machine uses; Linux additionally has /proc.
+      - name: Ensure lsof is present
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y lsof
+
+      - name: Integration and end-to-end tests
+        run: npm run test:integration
+
+  # ── Tier 3: OS-specific server/process discovery ────────────────────────
+  # The wrong-project regression suite. This is what actually proves server
+  # identity works on an OS, because it spawns real processes with explicit
+  # working directories and asserts they are attributed correctly.
+  #
+  # macOS is the reference implementation. Linux runs in continue-on-error
+  # until the /proc path has been verified in practice; a failure here must
+  # not be read as "Linux is supported" or block the merge queue while the
+  # implementation is still labelled Expected in docs/PLATFORM_SUPPORT.md.
+  discovery:
+    name: Server discovery (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            experimental: false
+          - os: ubuntu-latest
+            experimental: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Ensure lsof is present
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y lsof
+      - name: Wrong-project regression suite
+        run: npx vitest run test/integration/wrong-project.test.ts

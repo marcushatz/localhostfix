@@ -1,12 +1,6 @@
 import type { FrameworkAdapter } from '../frameworks/adapter.js';
-import {
-  allListeningPorts,
-  classifyCwd,
-  processDetails,
-  portOf,
-  type CwdRelation,
-  type PortOwner,
-} from './ownership.js';
+import { classifyCwd, portOf, type CwdRelation } from './ownership.js';
+import { processInspector, type PortOwner } from '../platform/index.js';
 import { isLocalUrl, probeUrl } from './probe.js';
 
 /**
@@ -87,9 +81,10 @@ export interface DiscoveryOptions {
 
 export async function discoverServers(opts: DiscoveryOptions): Promise<DiscoveryResult> {
   const probeTimeout = opts.probeTimeoutMs ?? 1500;
-  const listening = allListeningPorts();
-  const details = processDetails([...new Set(listening.map((l) => l.owner.pid))]);
-  const ownershipUnavailable = listening.length > 0 && details.size === 0;
+  const inspector = processInspector();
+  const listening = inspector.listListeningPorts();
+  const details = inspector.processDetails([...new Set(listening.map((l) => l.owner.pid))]);
+  const ownershipUnavailable = !inspector.supported || (listening.length > 0 && details.size === 0);
 
   const configuredPort =
     opts.configuredPort ?? (opts.configuredUrl ? portOf(opts.configuredUrl) : null) ?? null;
