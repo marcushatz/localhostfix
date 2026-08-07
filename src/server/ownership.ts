@@ -50,6 +50,21 @@ export function isDescendantOf(pid: number, ancestorPid: number, maxDepth = 12):
   return false;
 }
 
+/** Full command line of a process. Null when it cannot be read. */
+export function processCommandLine(pid: number): string | null {
+  try {
+    const out = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
+      encoding: 'utf8',
+      timeout: 2000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const trimmed = out.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function parentPid(pid: number): number | null {
   try {
     const out = execFileSync('ps', ['-o', 'ppid=', '-p', String(pid)], {
@@ -79,6 +94,160 @@ export function checkPortOwnership(port: number, ourPid: number | undefined): Ow
   if (owners.length === 0 || ourPid === undefined) return { status: 'unknown', owners };
   const ours = owners.some((o) => o.pid === ourPid || isDescendantOf(o.pid, ourPid));
   return ours ? { status: 'ours', owners } : { status: 'foreign', owners };
+}
+
+/**
+ * Every TCP port currently being listened on, with its owning process.
+ * Best-effort: returns [] where lsof is unavailable.
+ */
+export function allListeningPorts(): { port: number; owner: PortOwner }[] {
+  try {
+    const out = execFileSync('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpcn'], {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const results: { port: number; owner: PortOwner }[] = [];
+    let pid: number | null = null;
+    let command = '';
+    for (const line of out.split('\n')) {
+      if (line.startsWith('p')) {
+        pid = Number(line.slice(1));
+        command = '';
+      } else if (line.startsWith('c')) {
+        command = line.slice(1);
+      } else if (line.startsWith('n') && pid !== null) {
+        // Name looks like "*:3000", "127.0.0.1:3000", or "[::1]:3000".
+        const match = line.match(/:(\d+)$/);
+        if (match?.[1]) {
+          results.push({ port: Number(match[1]), owner: { pid, command } });
+        }
+      }
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Find dev servers already running FOR THIS PROJECT, on any port.
+ *
+ * Dev servers routinely land on a port nobody predicted — the default was
+ * taken, or a framework picked the next free one. Probing only the expected
+ * port then misses a perfectly healthy server, and probing common ports
+ * blindly risks hitting a different project. Matching the listening
+ * process's working directory to the project root finds the right server
+ * wherever it ended up.
+ */
+export interface ProjectServer {
+  url: string;
+  owner: PortOwner;
+  /** Full command line of the listening process, when readable. */
+  commandLine: string | null;
+}
+
+export function findProjectServers(projectRoot: string): ProjectServer[] {
+  const seen = new Set<number>();
+  const found: ProjectServer[] = [];
+  for (const { port, owner } of allListeningPorts()) {
+    if (seen.has(port)) continue;
+    seen.add(port);
+    const cwd = processCwd(owner.pid);
+    if (cwd && runsInsideProject(cwd, projectRoot)) {
+      found.push({
+        url: `http://localhost:${port}`,
+        owner,
+        commandLine: processCommandLine(owner.pid),
+      });
+    }
+  }
+  return found;
+}
+
+/** Working directory of a process, via lsof. Null when it cannot be read. */
+export function processCwd(pid: number): string | null {
+  try {
+    const out = execFileSync('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'], {
+      encoding: 'utf8',
+      timeout: 3000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    for (const line of out.split('\n')) {
+      if (line.startsWith('n')) return line.slice(1);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export type ProjectMatch =
+  | { status: 'same-project'; owners: PortOwner[]; cwd: string | null }
+  | { status: 'different-project'; owners: PortOwner[]; cwd: string }
+  | { status: 'unknown'; owners: PortOwner[]; cwd: string | null };
+
+/**
+ * Decide whether an already-running server on `port` belongs to the project
+ * being inspected.
+ *
+ * Reusing a running server is a feature — but reusing ANOTHER project's
+ * server silently verifies the wrong application, which is the exact failure
+ * this tool exists to prevent. Framework default ports (3000, 5173) collide
+ * constantly across projects, so this check earns its keep.
+ *
+ * Monorepos are handled by accepting either direction of containment: a dev
+ * server running in `apps/web` under a repo root still counts as the same
+ * project.
+ */
+export function checkServerProject(port: number, projectRoot: string): ProjectMatch {
+  const owners = listenersOnPort(port);
+  if (owners.length === 0) return { status: 'unknown', owners, cwd: null };
+
+  for (const owner of owners) {
+    const cwd = processCwd(owner.pid);
+    if (!cwd) continue;
+    if (runsInsideProject(cwd, projectRoot)) return { status: 'same-project', owners, cwd };
+    // A process whose cwd merely CONTAINS the project (often "/" for system
+    // daemons) tells us nothing either way. Claiming "different project"
+    // there would block legitimate setups, so stay honest and say unknown.
+    if (containsProject(cwd, projectRoot)) return { status: 'unknown', owners, cwd };
+    return { status: 'different-project', owners, cwd };
+  }
+  return { status: 'unknown', owners, cwd: null };
+}
+
+/**
+ * How a process's working directory relates to the project being inspected.
+ *
+ * `contains` is deliberately distinct from `inside`: a daemon whose cwd is
+ * "/" contains every project on the machine, and treating that as a match
+ * once caused AgentView to inspect macOS AirPlay on port 7000 instead of the
+ * developer's app.
+ */
+export type CwdRelation = 'inside' | 'contains' | 'unrelated';
+
+export function classifyCwd(cwd: string, projectRoot: string): CwdRelation {
+  const a = normalizePath(cwd);
+  const b = normalizePath(projectRoot);
+  if (a === b || a.startsWith(b + '/')) return 'inside';
+  if (a === '' || b.startsWith(a + '/')) return 'contains';
+  return 'unrelated';
+}
+
+function runsInsideProject(cwd: string, projectRoot: string): boolean {
+  return classifyCwd(cwd, projectRoot) === 'inside';
+}
+
+function containsProject(cwd: string, projectRoot: string): boolean {
+  return classifyCwd(cwd, projectRoot) === 'contains';
+}
+
+function normalizePath(p: string): string {
+  let out = p.replace(/\/+$/, '');
+  // macOS reports /private/var/... where callers often have /var/...
+  if (out.startsWith('/private/')) out = out.slice('/private'.length);
+  return out;
 }
 
 export function portOf(url: string): number | null {

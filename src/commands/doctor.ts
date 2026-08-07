@@ -136,6 +136,7 @@ export async function runDoctor(opts: {
     const result = await ensureServer({
       command: devCommand,
       cwd: path.join(project.root, config.cwd ?? '.'),
+      projectRoot: project.root,
       adapter,
       expectedPort: expectedPort ?? undefined,
       explicitUrl: config.url,

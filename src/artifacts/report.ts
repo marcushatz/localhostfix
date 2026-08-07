@@ -33,6 +33,12 @@ export interface InspectionReport {
      * ('reused'), or could not be determined ('unknown').
      */
     ownership: 'ours' | 'reused' | 'unknown';
+    /**
+     * Reachable servers deliberately NOT used because they belong to a
+     * different project. Surfaced so the developer learns why AgentView
+     * started its own server on a different port.
+     */
+    skippedForeign: { url: string; cwd: string; owners: string[] }[];
   };
   browser: {
     launched: boolean;
@@ -109,6 +115,11 @@ export function renderMarkdownReport(r: InspectionReport): string {
   lines.push('## Layers');
   lines.push('');
   lines.push(`- Server: ${serverLine(r)}`);
+  for (const skipped of r.server.skippedForeign) {
+    lines.push(
+      `  - Skipped ${skipped.url}: it is served by ${skipped.owners.join(', ')} running in ${skipped.cwd}, which is a different project.`,
+    );
+  }
   lines.push(`- Browser: ${browserLine(r)}`);
   lines.push(`- Navigation: ${navigationLine(r)}`);
   lines.push(`- Render: ${renderLine(r)}`);

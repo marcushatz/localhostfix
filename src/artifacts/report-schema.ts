@@ -38,6 +38,9 @@ export const InspectionReportSchema = z.object({
     actualUrl: z.string().nullable(),
     portMismatch: z.boolean(),
     ownership: z.enum(['ours', 'reused', 'unknown']),
+    skippedForeign: z.array(
+      z.object({ url: z.string(), cwd: z.string(), owners: z.array(z.string()) }),
+    ),
   }),
   browser: z.object({
     launched: z.boolean(),

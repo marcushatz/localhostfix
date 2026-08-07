@@ -12,12 +12,14 @@ export function registerInspectCommand(program: Command): void {
     .option('--route <route>', 'route to inspect (alternative to the positional argument)')
     .option('--headed', 'run Chromium with a visible window')
     .option('--allow-remote', 'permit non-localhost URLs (privacy risk — artifacts may contain remote data)')
+    .option('--allow-foreign-server', 'reuse a reachable server even when it belongs to a different project')
     .option('--json', 'print report.json to stdout instead of the human summary')
     .action(async (routeArg: string | undefined, opts: {
       url?: string;
       route?: string;
       headed?: boolean;
       allowRemote?: boolean;
+      allowForeignServer?: boolean;
       json?: boolean;
     }) => {
       let urlOverride = opts.url;
@@ -39,6 +41,7 @@ export function registerInspectCommand(program: Command): void {
         urlOverride,
         headed: opts.headed,
         allowRemote: opts.allowRemote,
+        allowForeignServer: opts.allowForeignServer,
         onProgress: opts.json ? undefined : (m) => console.error(pc.dim(`  ${m}`)),
       });
       if (opts.json) {

@@ -23,6 +23,13 @@ export interface FrameworkAdapter {
   errorOverlaySelectors: string[];
   /** Root element selectors the app is expected to mount into. */
   appRootSelectors: string[];
+  /**
+   * Patterns matching the command line of this framework's dev-server
+   * process. Used to pick the right server when several are listening
+   * inside the same project directory (a stray static server, a preview
+   * build, an old process).
+   */
+  devProcessPatterns: RegExp[];
 }
 
 function hasDep(pkg: PackageJson, name: string): boolean {
@@ -42,6 +49,7 @@ export const nextAdapter: FrameworkAdapter = {
   ],
   errorOverlaySelectors: ['nextjs-portal', '#__next-build-error', '[data-nextjs-dialog-overlay]'],
   appRootSelectors: ['#__next', 'body > main', '[data-nextjs-router]'],
+  devProcessPatterns: [/next-server/i, /next\s+dev/i, /\bnext\b.*\bdev\b/i],
 };
 
 export const viteAdapter: FrameworkAdapter = {
@@ -53,6 +61,7 @@ export const viteAdapter: FrameworkAdapter = {
   urlPatterns: [/Local:\s+(https?:\/\/\S+?)\/?\s/i, /Local:\s+(https?:\/\/\S+)/i],
   errorOverlaySelectors: ['vite-error-overlay'],
   appRootSelectors: ['#root', '#app'],
+  devProcessPatterns: [/vite/i],
 };
 
 export const genericAdapter: FrameworkAdapter = {
@@ -67,6 +76,7 @@ export const genericAdapter: FrameworkAdapter = {
   ],
   errorOverlaySelectors: [],
   appRootSelectors: ['#root', '#app', '#__next', 'main'],
+  devProcessPatterns: [/\bnode\b/i, /\bbun\b/i, /\bdeno\b/i],
 };
 
 /** Order matters: first match wins; generic is the fallback. */

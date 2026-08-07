@@ -2,7 +2,14 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { probeUrl } from './probe.js';
-import { checkPortOwnership, portOf, type PortOwner } from './ownership.js';
+import {
+  checkPortOwnership,
+  checkServerProject,
+  findProjectServers,
+  portOf,
+  type PortOwner,
+  type ProjectServer,
+} from './ownership.js';
 import type { FrameworkAdapter } from '../frameworks/adapter.js';
 
 export interface ServerHandle {
@@ -16,15 +23,28 @@ export interface ServerHandle {
    * 'unknown' means ownership could not be determined (no lsof/permissions).
    */
   ownership: 'ours' | 'reused' | 'unknown';
+  /** Reachable servers that were deliberately NOT used, and why. */
+  skippedForeign: ForeignServer[];
   /** Combined stdout+stderr captured so far (started servers only). */
   getLog(): string;
   /** Stop the server iff AgentView started it. Safe to call twice. */
   stop(): Promise<void>;
 }
 
+export interface ForeignServer {
+  url: string;
+  /** Working directory of the process that owns the port. */
+  cwd: string;
+  owners: PortOwner[];
+}
+
 export interface StartOptions {
   command: string;
   cwd: string;
+  /** Project root, used to tell our own dev server from a neighbour's. */
+  projectRoot: string;
+  /** Accept a reachable server that belongs to a different project. */
+  allowForeignServer?: boolean | undefined;
   adapter: FrameworkAdapter;
   expectedPort?: number | undefined;
   explicitUrl?: string | undefined;
@@ -80,24 +100,36 @@ export function normalizeLocalUrl(raw: string): string {
 export async function ensureServer(opts: StartOptions): Promise<StartResult> {
   const candidates = candidateUrls(opts);
 
-  // 1. Reuse an already-running server. Only user-declared locations
-  //    (explicit url / expectedPort / framework default) are reused, so
-  //    connecting to a pre-existing process here is intentional.
+  // 1. Reuse an already-running server — but only if it belongs to THIS
+  //    project. Framework default ports collide across projects constantly,
+  //    and reusing a neighbour's server would verify the wrong application.
+  const skippedForeign: ForeignServer[] = [];
   for (const url of candidates) {
     const probe = await probeUrl(url, 1500);
-    if (probe.ok) {
-      return {
-        ok: true,
-        handle: {
-          child: null,
-          startedByUs: false,
-          url,
-          ownership: 'reused',
-          getLog: () => '',
-          stop: async () => {},
-        },
-      };
+    if (!probe.ok) continue;
+
+    const port = portOf(url);
+    const match = port === null ? null : checkServerProject(port, opts.projectRoot);
+    if (match?.status === 'different-project' && !opts.allowForeignServer) {
+      skippedForeign.push({
+        url,
+        cwd: match.cwd,
+        owners: match.owners,
+      });
+      continue; // start our own server instead
     }
+    return {
+      ok: true,
+      handle: {
+        child: null,
+        startedByUs: false,
+        url,
+        ownership: 'reused',
+        skippedForeign,
+        getLog: () => '',
+        stop: async () => {},
+      },
+    };
   }
 
   // 2. Start it ourselves.
@@ -195,6 +227,7 @@ export async function ensureServer(opts: StartOptions): Promise<StartResult> {
           startedByUs: true,
           url,
           ownership: ownership.status === 'ours' ? 'ours' : 'unknown',
+          skippedForeign,
           getLog: () => log,
           stop,
         },
@@ -210,9 +243,29 @@ export async function ensureServer(opts: StartOptions): Promise<StartResult> {
   return { ok: false, kind: 'SERVER_START_TIMEOUT', log, probedUrls: [...probed] };
 }
 
+export function rankProjectServers(
+  servers: ProjectServer[],
+  adapter: FrameworkAdapter,
+): ProjectServer[] {
+  const matches = (s: ProjectServer) =>
+    s.commandLine !== null && adapter.devProcessPatterns.some((p) => p.test(s.commandLine!));
+  const preferred = servers.filter(matches);
+  const rest = servers.filter((s) => !matches(s));
+  return [...preferred, ...rest];
+}
+
 function candidateUrls(opts: StartOptions): string[] {
   const urls: string[] = [];
+  // 1. Explicit user intent always wins.
   if (opts.explicitUrl) urls.push(normalizeLocalUrl(opts.explicitUrl));
+  // 2. A server verifiably belonging to this project beats any guess about
+  //    which port it "should" be on. Several may be running inside the same
+  //    directory (a stray static server, an old preview build), so prefer
+  //    the one whose process actually looks like this framework's dev server.
+  for (const server of rankProjectServers(findProjectServers(opts.projectRoot), opts.adapter)) {
+    urls.push(server.url);
+  }
+  // 3. Then the configured port, then the framework default.
   if (opts.expectedPort) urls.push(`http://localhost:${opts.expectedPort}`);
   if (opts.adapter.defaultPort && opts.adapter.defaultPort !== opts.expectedPort) {
     urls.push(`http://localhost:${opts.adapter.defaultPort}`);

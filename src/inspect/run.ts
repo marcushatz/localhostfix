@@ -30,6 +30,7 @@ export interface InspectOptions {
   urlOverride?: string | undefined;
   headed?: boolean | undefined;
   allowRemote?: boolean | undefined;
+  allowForeignServer?: boolean | undefined;
   onProgress?: ((message: string) => void) | undefined;
 }
 
@@ -97,6 +98,8 @@ export async function runInspection(opts: InspectOptions): Promise<InspectOutcom
     const result = await ensureServer({
       command: devCommand ?? '',
       cwd: path.join(project.root, config.cwd ?? '.'),
+      projectRoot: project.root,
+      allowForeignServer: opts.allowForeignServer ?? false,
       adapter,
       expectedPort: config.expectedPort ?? adapter.defaultPort ?? undefined,
       explicitUrl,
@@ -140,6 +143,11 @@ export async function runInspection(opts: InspectOptions): Promise<InspectOutcom
     builder.server.startedByAgentView = server.startedByUs;
     builder.server.actualUrl = server.url;
     builder.server.ownership = server.ownership;
+    builder.server.skippedForeign = server.skippedForeign.map((f) => ({
+      url: f.url,
+      cwd: f.cwd,
+      owners: f.owners.map((o) => `${o.command} (pid ${o.pid})`),
+    }));
     const expected = builder.server.expectedPort;
     const actualPort = Number(new URL(server.url).port || (server.url.startsWith('https') ? 443 : 80));
     builder.server.portMismatch = expected !== null && actualPort !== expected;
@@ -225,6 +233,7 @@ class ReportBuilder {
     actualUrl: null,
     portMismatch: false,
     ownership: 'unknown',
+    skippedForeign: [],
   };
   browser: InspectionReport['browser'] = { launched: false, executablePath: null, detail: null };
   navigation: InspectionReport['navigation'] = {

@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "agentview",
+    "version": "0.1.0"
+  },
+  "startedAt": "2026-08-07T12:34:38.014Z",
+  "durationMs": 4632,
+  "verdict": "ROUTE_NOT_FOUND",
+  "confidence": "high",
+  "layer": "navigation",
+  "domain": "application",
+  "exitCode": 1,
+  "route": "/this-route-does-not-exist",
+  "url": "http://localhost:3005/this-route-does-not-exist",
+  "server": {
+    "reachable": true,
+    "startedByAgentView": false,
+    "reusedExisting": true,
+    "command": "npm run dev",
+    "expectedPort": 3000,
+    "actualUrl": "http://localhost:3005",
+    "portMismatch": true,
+    "ownership": "reused",
+    "skippedForeign": []
+  },
+  "browser": {
+    "launched": true,
+    "executablePath": "/Users/example/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+    "detail": null
+  },
+  "navigation": {
+    "attempted": true,
+    "status": 404,
+    "error": null,
+    "finalUrl": "http://localhost:3005/this-route-does-not-exist/",
+    "redirected": false
+  },
+  "render": {
+    "blank": {
+      "likelyBlank": "uncertain",
+      "confidence": "low",
+      "reasons": [
+        "no visible interactive elements",
+        "screenshot was nearly uniform (99% one colour)",
+        "an intentionally minimal page may resemble a blank page"
+      ]
+    },
+    "visibleElementCount": 16,
+    "visibleTextLength": 44,
+    "title": "Example App — marketing site"
+  },
+  "counts": {
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "failedRequests": 1
+  },
+  "evidence": [
+    {
+      "kind": "http-404",
+      "detail": "main document returned HTTP 404 for http://localhost:3005/this-route-does-not-exist"
+    }
+  ],
+  "recommendation": "The route /this-route-does-not-exist does not exist on this server. Check the route path or inspect a different route.",
+  "artifacts": {
+    "reportMd": "report.md",
+    "desktopScreenshot": "desktop.png",
+    "mobileScreenshot": "mobile.png",
+    "console": "console.json",
+    "network": "network.json",
+    "pageErrors": "page-errors.json",
+    "serverLog": null,
+    "snapshot": "snapshot.yml"
+  },
+  "runDir": ".agentview/runs/2026-08-07T12-34-38"
+}
