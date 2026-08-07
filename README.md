@@ -8,7 +8,7 @@
 **When Claude Code can't properly see your localhost frontend, run one command.**
 
 ```bash
-localhostfix fix
+npx localhostfix fix
 ```
 
 LocalhostFix walks the path from your project to the rendered browser. It:
@@ -18,9 +18,8 @@ LocalhostFix walks the path from your project to the rendered browser. It:
 - **verifies** the frontend actually renders before reporting success
 - **refuses** to inspect a different project that happens to answer on your port
 
-> ⚠️ **Not on npm yet.** `npx localhostfix` does not work today — see
-> [Installation](#installation) to run it from source. Status: 0.1 release
-> candidate, verified on macOS and Linux.
+> Status: v0.1.0. Verified on macOS and Linux; see
+> [Supported environments](#supported-environments).
 
 ## The problem
 
@@ -43,7 +42,7 @@ LocalhostFix walks that chain in order, repairs the parts it can repair safely, 
 **Something is repairable** — it fixes it, then re-inspects to prove it worked:
 
 ```
-$ localhostfix fix
+$ npx localhostfix fix
 
   FIXED
 
@@ -59,7 +58,7 @@ $ localhostfix fix
 **The problem is your code** — it stops, changes nothing, and hands over evidence:
 
 ```
-$ localhostfix fix
+$ npx localhostfix fix
 
   APPLICATION_FIX_REQUIRED
 
@@ -78,7 +77,7 @@ $ localhostfix fix
 **It won't act blindly** — installing software is your call:
 
 ```
-$ localhostfix fix
+$ npx localhostfix fix
 
   COULD_NOT_REPAIR
 
@@ -160,21 +159,16 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design and the res
 
 ## Installation
 
-Requires **Node.js 22+**.
-
-**Not published to npm yet.** Install from source:
+Requires **Node.js 22+**. No install step needed — run it directly in the project you want to inspect:
 
 ```bash
-git clone https://github.com/marcushatz/localhostfix.git
-cd localhostfix
-npm install
-npm run build
-npm link          # puts `localhostfix` on your PATH
+npx localhostfix fix
 ```
 
-Then, in the project you want to inspect:
+Or install it globally if you use it often:
 
 ```bash
+npm install -g localhostfix
 localhostfix fix
 ```
 
@@ -185,15 +179,15 @@ npx playwright install chromium
 ```
 
 <details>
-<summary>After npm publication (not yet available)</summary>
-
-Once `localhostfix` is published, no install step will be needed:
+<summary>From source (for contributors)</summary>
 
 ```bash
-npx localhostfix fix
+git clone https://github.com/marcushatz/localhostfix.git
+cd localhostfix
+npm install
+npm run build
+npm link          # puts `localhostfix` on your PATH
 ```
-
-This does **not** work today. Until then, use the source install above.
 
 </details>
 
@@ -201,11 +195,11 @@ This does **not** work today. Until then, use the source install above.
 
 ```bash
 cd your-project
-localhostfix fix               # the one to remember
-localhostfix setup --claude    # install the Claude Code skill
-localhostfix inspect           # capture evidence for the default route
-localhostfix inspect /pricing  # a specific route
-localhostfix doctor            # detailed check of the whole chain
+npx localhostfix fix               # the one to remember
+npx localhostfix setup --claude    # install the Claude Code skill
+npx localhostfix inspect           # capture evidence for the default route
+npx localhostfix inspect /pricing  # a specific route
+npx localhostfix doctor            # detailed check of the whole chain
 ```
 
 Artifacts land in `.localhostfix/latest/` (and a timestamped directory under `.localhostfix/runs/`).
@@ -294,7 +288,7 @@ No telemetry, no network calls, nothing transmitted. The only requests Localhost
 
 ## Troubleshooting
 
-**Start with `localhostfix fix`.** Most cases below are what it exists to handle.
+**Start with `npx localhostfix fix`.** Most cases below are what it exists to handle.
 
 **"Chromium executable unavailable"** — run `npx playwright install chromium`, or `localhostfix fix --yes`.
 

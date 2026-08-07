@@ -37,7 +37,6 @@
     "type": "git",
     "url": "https://github.com/marcushatz/localhostfix.git"
   },
-  "private": true,
   "dependencies": {
     "commander": "^15.0.0",
     "picocolors": "^1.1.1",

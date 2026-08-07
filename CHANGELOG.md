@@ -9,101 +9,85 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
 
 ## [Unreleased]
 
-### Changed — renamed to LocalhostFix (2026-08-07)
+Nothing yet.
 
-- The project was renamed from its working name "AgentView" to **LocalhostFix**
-  before any public release. The npm package, CLI binary, and GitHub repository
-  are all `localhostfix`, each verified available from the terminal — see
-  docs/NAMING.md for the evidence and for why the previous name was abandoned.
-- Generated paths moved: `.agentview/` → `.localhostfix/`, and the Claude Code
-  skill from `.claude/skills/agentview/` to `.claude/skills/localhostfix/`.
-  Hook entries are tagged `localhostfix-hook`.
-- **Legacy handling, deliberately minimal.** Because nothing was ever published,
-  there is no migration system. `doctor` and `setup` print a one-line notice
-  when a pre-rename `.agentview/` directory is present, suggesting
-  `mv .agentview .localhostfix`. Nothing is moved or deleted automatically and
-  no command reads the old directory. `legacyDirNotice()` in
-  `src/config/config.ts` is marked for removal once no development machine
-  still has one.
+## [0.1.0] - 2026-08-07
 
-### Added — `localhostfix fix` (2026-08-07)
+First public release.
 
-- New command that attempts safe recovery of frontend inspection and then
-  **verifies** whether it works again. It reuses the discovery and diagnosis
-  code behind `doctor` and `inspect`; there is no parallel logic.
-- Repairs automatically: a wrong stored port, a dev server that is not running,
-  a dev server needing longer to become ready, a corrupt `.localhostfix/config.json`
-  (backed up before regeneration), and a stale inspection lock from a crashed run.
-- Requires explicit approval (`--yes`) before installing the Chromium build.
-- Diagnoses without acting: application crashes, blank renders, failed APIs,
-  a dev server that exits on startup, a port held by a foreign process, several
-  ambiguous project servers, a missing dev command, and a non-localhost URL.
-- Outcomes `ALREADY_HEALTHY` / `FIXED` / `APPLICATION_FIX_REQUIRED` /
-  `COULD_NOT_REPAIR` with exit codes 0/0/1/2. `FIXED` is reported only when a
-  fresh inspection after the repair actually rendered the application.
-- Never modifies application source, signals a process it did not start, or
-  disables a privacy guard to make a run succeed.
+### Commands
 
-### Changed — pre-release hardening (2026-08-07)
-
-- `doctor` and `inspect` now share one authoritative server-discovery module.
-  `doctor` previously probed only the configured port and could therefore
-  report a project as healthy because *something* answered there.
-- New `MULTIPLE_PROJECT_SERVERS` verdict: when several servers run inside the
-  project and none is clearly the dev server, LocalhostFix reports the ambiguity
-  and asks for `--url` instead of guessing.
-- A missing dev command is now an error only when no project server is
-  already running.
-- OS-specific work moved behind a `ProcessInspector` interface
-  (`src/platform/`), with a `/proc`-based Linux implementation and an explicit
-  unsupported implementation for Windows.
-- CLI polish: relative artifact paths, honest `setup` guidance when a project
-  cannot be inspected yet, clearer `status` wording, and graceful `watch`
-  shutdown that cannot orphan a dev server.
-
-### Fixed — pre-release hardening (2026-08-07)
-
-- `doctor` probed a configured URL without checking it was localhost. The
-  guard now lives inside discovery, the only code that makes requests.
-
-### Security
-
-- Adversarial redaction tests leak fake secrets through authorization headers,
-  cookies, `x-api-key`, `x-csrf-token`, and query parameters, then scan every
-  generated artifact. Verified non-vacuous by a negative control.
-
-### Added — 0.1.0 (not yet released)
-
+- `localhostfix fix` — attempts safe recovery of frontend inspection, then
+  re-inspects to verify. Reports `ALREADY_HEALTHY`, `FIXED`,
+  `APPLICATION_FIX_REQUIRED`, or `COULD_NOT_REPAIR`, with exit codes 0/0/1/2.
+  `FIXED` is only reported when a fresh inspection after the repair actually
+  rendered the application.
 - `localhostfix inspect` — one-shot rendered-frontend verification producing
   desktop and mobile screenshots, console/network/page-error diagnostics, an
   accessibility snapshot, and Markdown + JSON reports.
 - `localhostfix doctor` — layered health check of the project, dev server,
-  browser, and agent integration, with `--fix` for safe repairs.
+  port ownership, browser, and agent integration, with `--fix` for safe repairs.
 - `localhostfix setup` — framework, package-manager, dev-command and port
   detection; project configuration; `.gitignore` entries; optional Claude Code
   integration via `--claude`.
 - `localhostfix watch`, `localhostfix status`, `localhostfix clean`.
-- Layered failure model with 17 verdicts, each mapped to an inspection layer,
-  a domain (`setup` / `application` / `healthy` / `unknown`), and a stable
-  exit code.
-- Conservative multi-signal blank-render detection reporting `true`, `false`,
-  or `uncertain` with confidence and evidence.
-- Dev-server discovery that finds a project's server **on any port** by
-  matching listening processes' working directories, and ranks candidates by
-  whether they look like the framework's dev server.
-- Port-ownership verification preventing LocalhostFix from inspecting — and
-  reporting on — an application other than the one under development.
-- Redaction of sensitive headers and query parameters; request and response
-  bodies are never stored.
-- Claude Code project skill plus optional loop-safe automatic verification
-  hooks, installed to `.claude/settings.local.json` by default.
-- 108 tests spanning unit, integration, and hook end-to-end coverage.
-- GitHub Actions CI with three tiers that do not pretend to be each other:
-  code compatibility, browser integration, and OS-specific server discovery.
-- `docs/PLATFORM_SUPPORT.md` (Verified/Expected/Untested/Unsupported per
-  feature) and `docs/NAMING.md` (name availability research).
 
-[Unreleased]: https://github.com/marcushatz/localhostfix/commits/main
+### Repairs automatically
 
-<!-- Once v0.1.0 is tagged, change the link above to:
-     https://github.com/marcushatz/localhostfix/compare/v0.1.0...HEAD -->
+A wrong stored port, a dev server that is not running, a dev server needing
+longer to become ready, a corrupt `.localhostfix/config.json` (backed up before
+regeneration), and a stale inspection lock from a crashed run. Installing the
+Chromium build requires explicit approval via `--yes`.
+
+### Diagnoses without acting
+
+Application crashes, blank renders, failed API requests, missing routes,
+authentication gates, a dev server that exits during startup, a port held by a
+foreign process, several ambiguous project servers, a missing dev command, and
+a configured URL that is not localhost. Application source is never modified.
+
+### Server identity
+
+Dev-server discovery finds a project's server **on any port** by matching
+listening processes' working directories, and ranks candidates by whether they
+look like the framework's dev server. Port-ownership verification prevents
+LocalhostFix from inspecting — and reporting on — an application other than the
+one under development. Where OS process inspection is unavailable, ownership is
+reported as unknown rather than guessed.
+
+### Diagnosis model
+
+A layered failure model with 19 verdicts, each mapped to an inspection layer, a
+domain (`setup` / `application` / `healthy` / `unknown`), and a stable exit
+code. Blank-render detection is multi-signal and conservative, reporting
+`true`, `false`, or `uncertain` with confidence and evidence.
+
+### Claude Code integration
+
+A project skill at `.claude/skills/localhostfix/SKILL.md`, plus optional
+loop-safe automatic verification hooks installed to
+`.claude/settings.local.json` by default. Existing settings are merged, never
+overwritten, and backed up first.
+
+### Privacy and security
+
+No telemetry and no network calls beyond the local server being inspected.
+Localhost only unless explicitly overridden. Sensitive headers and query
+parameters are redacted from saved network data; request and response bodies
+are never stored. Run artifacts are git-ignored.
+
+### Platform support
+
+macOS and Linux are verified in CI, per-feature, in
+[docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md). Windows cannot verify
+server identity and is not supported for that; its code compatibility is tested
+but that is not the same as working.
+
+### Testing
+
+108 tests across unit, integration, and hook end-to-end coverage. GitHub
+Actions CI runs three tiers that do not stand in for each other: code
+compatibility, browser integration, and OS-specific server discovery.
+
+[Unreleased]: https://github.com/marcushatz/localhostfix/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/marcushatz/localhostfix/releases/tag/v0.1.0
