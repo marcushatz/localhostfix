@@ -41,6 +41,8 @@ export interface StartOptions {
   projectRoot: string;
   /** Accept a reachable server that belongs to a different project. */
   allowForeignServer?: boolean | undefined;
+  /** Permit probing a non-localhost configured URL. */
+  allowRemote?: boolean | undefined;
   adapter: FrameworkAdapter;
   expectedPort?: number | undefined;
   explicitUrl?: string | undefined;
@@ -106,6 +108,7 @@ export async function ensureServer(opts: StartOptions): Promise<StartResult> {
     adapter: opts.adapter,
     configuredUrl: opts.explicitUrl,
     configuredPort: opts.expectedPort,
+    allowRemote: opts.allowRemote,
   });
 
   const skippedForeign: ForeignServer[] = discovery.foreignServers.map((f) => ({

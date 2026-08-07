@@ -95,6 +95,7 @@ export async function runInspection(opts: InspectOptions): Promise<InspectOutcom
       adapter,
       expectedPort: config.expectedPort ?? adapter.defaultPort ?? undefined,
       explicitUrl,
+      allowRemote: opts.allowRemote ?? config.allowRemote,
       startupTimeoutMs: config.startupTimeoutMs,
     });
     if (!result.ok) {

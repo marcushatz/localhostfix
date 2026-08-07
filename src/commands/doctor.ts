@@ -132,7 +132,16 @@ export async function runDoctor(opts: {
     adapter,
     configuredUrl: config.url,
     configuredPort: expectedPort ?? undefined,
+    allowRemote: config.allowRemote,
   });
+
+  if (discovery.remoteUrlBlocked) {
+    note(configuredSection, 'fail',
+      `${discovery.remoteUrlBlocked} is not a localhost URL — AgentView did not contact it`);
+    recommendations.push(
+      'AgentView inspects localhost only. Set a local "url", or pass --allow-remote if you understand that artifacts may then contain remote data.',
+    );
+  }
 
   const ownershipSection: Section = { title: 'Port ownership', findings: [] };
   sections.push(ownershipSection);

@@ -7,7 +7,7 @@ import {
   type CwdRelation,
   type PortOwner,
 } from './ownership.js';
-import { probeUrl } from './probe.js';
+import { isLocalUrl, probeUrl } from './probe.js';
 
 /**
  * The single authoritative answer to "which local server belongs to this
@@ -66,6 +66,12 @@ export interface DiscoveryResult {
   configuredPort: number | null;
   /** True when process inspection is unavailable (no lsof, restricted host). */
   ownershipUnavailable: boolean;
+  /**
+   * Set when a configured URL was NOT probed because it is not localhost and
+   * remote inspection was not explicitly allowed. Enforced here so that no
+   * caller can reach a remote host by accident.
+   */
+  remoteUrlBlocked: string | null;
 }
 
 export interface DiscoveryOptions {
@@ -75,6 +81,8 @@ export interface DiscoveryOptions {
   configuredPort?: number | undefined;
   /** Probe timeout per candidate. */
   probeTimeoutMs?: number;
+  /** Permit probing a non-localhost configured URL. */
+  allowRemote?: boolean | undefined;
 }
 
 export async function discoverServers(opts: DiscoveryOptions): Promise<DiscoveryResult> {
@@ -147,11 +155,21 @@ export async function discoverServers(opts: DiscoveryOptions): Promise<Discovery
     configuredUrl: opts.configuredUrl ?? null,
     configuredPort,
     ownershipUnavailable,
+    remoteUrlBlocked: null,
   };
+
+  // Privacy guard, enforced at the only place that makes requests: never
+  // touch a non-localhost host unless explicitly permitted.
+  const configuredUrlIsProbeable =
+    opts.configuredUrl !== undefined &&
+    (isLocalUrl(opts.configuredUrl) || opts.allowRemote === true);
+  if (opts.configuredUrl !== undefined && !configuredUrlIsProbeable) {
+    result.remoteUrlBlocked = opts.configuredUrl;
+  }
 
   // 1. An explicit URL is a deliberate instruction and is honoured, provided
   //    something is actually there.
-  if (opts.configuredUrl) {
+  if (opts.configuredUrl && configuredUrlIsProbeable) {
     const probe = await probeUrl(opts.configuredUrl, probeTimeout);
     if (probe.ok) {
       const port = portOf(opts.configuredUrl);
@@ -197,8 +215,12 @@ export async function discoverServers(opts: DiscoveryOptions): Promise<Discovery
   //    be serving it on a host where ownership cannot be read; accept that
   //    only when the owner is genuinely unknown, never when it is foreign.
   if (configuredPort !== null && !foreignServers.some((f) => f.port === configuredPort)) {
-    const url = opts.configuredUrl ?? `http://localhost:${configuredPort}`;
-    const probe = await probeUrl(url, probeTimeout);
+    const url = configuredUrlIsProbeable && opts.configuredUrl
+      ? opts.configuredUrl
+      : `http://localhost:${configuredPort}`;
+    const probe = isLocalUrl(url) || opts.allowRemote === true
+      ? await probeUrl(url, probeTimeout)
+      : { ok: false as const };
     if (probe.ok) {
       const listener = listening.find((l) => l.port === configuredPort);
       const candidate = listener
