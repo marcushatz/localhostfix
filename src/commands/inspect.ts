@@ -81,6 +81,12 @@ export function printSummary(r: InspectionReport, runDir: string): void {
   console.log('');
   console.log(pc.bold('  Next action ') + r.recommendation);
   console.log('');
-  console.log(pc.dim(`  Artifacts: ${path.join(runDir, 'report.md')}`));
+  // Relative to where the user actually is: absolute paths are noise, and
+  // they make output unusable in shared logs or documentation.
+  const reportPath = path.relative(process.cwd(), path.join(runDir, 'report.md'));
+  console.log(pc.dim(`  Report:      ${reportPath}`));
+  if (r.artifacts.desktopScreenshot) {
+    console.log(pc.dim(`  Screenshots: ${path.join('.agentview', 'latest')}/{desktop,mobile}.png`));
+  }
   console.log('');
 }

@@ -18,17 +18,20 @@ export function registerStatusCommand(program: Command): void {
       console.log('');
       console.log(pc.bold('  AgentView status'));
       console.log(`  Project root : ${project.root}`);
-      console.log(`  Config       : ${source ?? '(defaults — run `agentview setup`)'}`);
-      console.log(`  Framework    : ${config.framework ?? '(auto-detect)'}`);
-      console.log(`  Dev command  : ${config.devCommand ?? '(auto-detect)'}`);
-      console.log(`  URL          : ${config.url ?? `(discovered; expected port ${config.expectedPort ?? 'auto'})`}`);
+      console.log(`  Config       : ${source ? path.relative(process.cwd(), source) : 'none — run `agentview setup`'}`);
+      console.log(`  Framework    : ${config.framework ?? 'detected at run time'}`);
+      console.log(`  Dev command  : ${config.devCommand ?? 'detected at run time'}`);
+      console.log(
+        `  URL          : ${config.url ?? (config.expectedPort ? `discovered (expecting port ${config.expectedPort})` : 'discovered at run time')}`,
+      );
       console.log(`  Claude skill : ${claude.skillInstalled ? 'installed' : 'not installed'}`);
       console.log(`  Auto-inspect : ${claude.hookInstalled ? config.autoInspect : 'off (hook not installed)'}`);
       const latestReport = path.join(agentviewDir(project.root), 'latest', 'report.json');
       if (fs.existsSync(latestReport)) {
         try {
           const report = JSON.parse(fs.readFileSync(latestReport, 'utf8')) as InspectionReport;
-          console.log(`  Last run     : ${report.verdict} at ${report.startedAt} (${report.url ?? 'no url'})`);
+          const when = report.startedAt.replace('T', ' ').replace(/\..+$/, '');
+          console.log(`  Last run     : ${report.verdict} — ${report.url ?? 'no URL determined'} (${when})`);
         } catch {
           console.log('  Last run     : (unreadable report.json)');
         }

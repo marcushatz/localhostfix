@@ -77,6 +77,31 @@ export function registerWatchCommand(program: Command): void {
 
       // Initial run so the watcher always starts from a known state.
       schedule();
-      await new Promise(() => {}); // run until Ctrl-C
+
+      // Interrupting mid-inspection could otherwise orphan a dev server that
+      // AgentView started, so wait for the in-flight run to finish cleaning
+      // up before exiting. A second interrupt exits immediately.
+      await new Promise<void>((resolve) => {
+        let stopping = false;
+        const shutdown = () => {
+          if (stopping) process.exit(130);
+          stopping = true;
+          if (timer) clearTimeout(timer);
+          if (running) {
+            console.log(pc.dim('\n  Finishing the current inspection before exiting… (Ctrl-C again to force)'));
+            const poll = setInterval(() => {
+              if (!running) {
+                clearInterval(poll);
+                resolve();
+              }
+            }, 100);
+          } else {
+            resolve();
+          }
+        };
+        process.on('SIGINT', shutdown);
+        process.on('SIGTERM', shutdown);
+      });
+      console.log(pc.dim('  Stopped watching.'));
     });
 }

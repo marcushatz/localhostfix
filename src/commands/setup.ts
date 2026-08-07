@@ -69,7 +69,10 @@ export function registerSetupCommand(program: Command): void {
       // Browser dependency readiness.
       const availability = checkBrowserInstalled();
       if (availability.installed) {
-        console.log(pc.green(`  ✓ Chromium ready: ${availability.executablePath}`));
+        // The full executable path is ~120 characters of noise; the build
+        // directory is the part that identifies what will run.
+        const build = availability.foundBuilds.find((b) => b.startsWith('chromium-')) ?? 'installed';
+        console.log(pc.green(`  ✓ Chromium ready (${build})`));
       } else {
         console.log(pc.yellow('  ! Chromium is not installed for Playwright.'));
         console.log(pc.yellow('    AgentView will not download browsers without your approval. Run:'));
@@ -86,9 +89,27 @@ export function registerSetupCommand(program: Command): void {
       console.log('');
       console.log(pc.bold('  Changes made'));
       for (const c of changes) console.log(`  - ${c}`);
+
+      // Say plainly whether the project is ready, and what to do if not.
+      // Reporting "setup complete" for a project AgentView cannot inspect
+      // would only move the failure to the next command.
+      console.log('');
+      console.log(pc.bold('  Next steps'));
+      const canRun = Boolean(parsed.devCommand || parsed.url);
+      if (!canRun) {
+        console.log(pc.yellow('  ! AgentView cannot inspect this project yet: no dev command was found.'));
+        console.log('    Add a "dev" script to package.json, or set "devCommand" or "url"');
+        console.log(`    in ${path.relative(process.cwd(), file) || '.agentview/config.json'}.`);
+      } else if (!availability.installed) {
+        console.log('  1. npx playwright install chromium');
+        console.log('  2. agentview doctor');
+      } else {
+        console.log('  1. agentview doctor      check the whole chain');
+        console.log('  2. agentview inspect     inspect the rendered app');
+      }
       if (!opts.claude) {
         console.log('');
-        console.log(pc.dim('  Tip: `agentview setup --claude` installs the Claude Code project skill and verification hook.'));
+        console.log(pc.dim('  `agentview setup --claude` installs the Claude Code skill and verification hook.'));
       }
       console.log('');
     });
