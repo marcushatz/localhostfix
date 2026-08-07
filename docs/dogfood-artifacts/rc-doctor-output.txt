@@ -1,0 +1,38 @@
+
+  AGENTVIEW DOCTOR
+
+  Project
+  ✓ Project root: /Users/example/project-a
+  ✓ Framework: Next.js
+  ✓ Package manager: npm
+  ✓ Development command: npm run dev
+  ! No AgentView config yet (defaults in use) — run `agentview setup`
+
+  Configured URL
+  ! http://localhost:3000 (Next.js default — not configured)
+
+  Port ownership
+  ✗ Port 3000 belongs to a different project:
+      /Users/example/project-b
+
+  Detected project server
+  ✓ Current project is listening on:
+      http://localhost:3005
+  ✓ Chosen because: matches the configured framework dev command
+  ? Also running in this project: 4599 — Python -m http.server 4599
+  ? Also running in this project: 4620 — Python -m http.server 4620
+  ! Configuration expects port 3000, but this project's server is on 3005
+
+  Browser
+  ✓ Playwright package available (bundled with AgentView)
+  ✓ Chromium executable: /Users/example/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
+  ✓ Chromium launches successfully
+
+  Claude integration
+  ! Project skill not installed — run `agentview setup --claude`
+  ! Automatic verification hook not enabled
+
+  Recommended actions
+  1. The configured port is serving another project. Inspecting it would verify the wrong application.
+  2. Update AgentView configuration to port 3005 — run `agentview doctor --fix`.
+

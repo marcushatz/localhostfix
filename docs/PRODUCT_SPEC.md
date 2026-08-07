@@ -114,7 +114,7 @@ Store detected URL/port; install supported Chromium after explicit approval; cre
 
 - **Project Skill** — teaches Claude: inspect before making frontend claims; run AgentView after frontend changes; read report + both screenshots + errors; never claim visual verification when inspection failed; distinguish setup failure from app failure.
 - **Automatic verification (optional)** — debounced dirty-state model: frontend edits mark verification stale; one inspection runs at task-completion time (Stop hook); the report is fed back to Claude. Modes: `off` / `advisory` / `enforced` (default `advisory`). Loop-safe by design.
-- **MCP** — AgentView can detect/validate/recommend Playwright MCP config but never requires MCP for its own inspection.
+- **MCP** — NOT IMPLEMENTED in v0.1. AgentView neither detects nor configures Playwright MCP. Its inspection has never required an MCP connection, which was the point of the architecture; helping configure MCP remains a possible future addition.
 
 ## Privacy & security posture (v0.1)
 
@@ -122,7 +122,7 @@ Localhost-only by default; explicit override + warning for remote URLs; zero tel
 
 ## Naming note
 
-The unscoped npm name `agentview` is already taken (an unrelated package, v0.1.13, last modified 2026-02-05). v0.1 therefore uses the placeholder package name `@agentview/cli` with `"private": true`; the product name remains **AgentView**. Before any npm release, either register the `@agentview` scope, negotiate the unscoped name, or choose a distinct package name. No GitHub/trademark conflict check blocker was identified for a scoped package; revisit before publishing.
+**Unresolved release blocker.** The npm name `agentview` is taken by a package that ships a CLI binary of the same name, the `@agentview` scope is owned by that same author (so the `@agentview/cli` placeholder can never be published), `github.com/agentview` is taken by a project in this category, and a ~3K-star tool called AgentsView occupies adjacent mindshare. Full evidence and recommendations in [NAMING.md](NAMING.md).
 
 ## Acceptance criteria
 

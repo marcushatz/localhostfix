@@ -1,5 +1,10 @@
 # AgentView — Dogfood Report
 
+> Two dogfooding passes are recorded here: the original v0.1 build, and the
+> pre-release hardening pass that followed. Read the
+> [release-candidate section](#release-candidate-dogfood-2026-08-07) for the
+> current state of the tool.
+
 Date: 2026-08-07 · Platform: macOS (darwin 25.5.0, arm64) · Node 25.2.1 · Playwright 1.62.1 (Chromium build 1234)
 
 Target: **`/Users/example/project-a`** — a real Next.js 16.2.9 marketing site, chosen because it is the application that previously suffered unreliable localhost inspection.
@@ -110,7 +115,7 @@ All commands run from `/Users/example/project-a` with no AgentView config presen
   ! Automatic verification hook not enabled
 ```
 
-Known limitation visible here: `doctor` still probes only the configured/default port for its "already running" line, so it reported the neighbouring app on 3000. `inspect` performs the full project-ownership discovery. Aligning `doctor` with `inspect` is listed under limitations below.
+Known limitation visible here — **since fixed**: `doctor` probed only the configured/default port for its "already running" line, so it reported the neighbouring app on 3000 as though it were this project's. `inspect` already performed full project-ownership discovery, and the two disagreeing was itself the bug. Both now share `src/server/discovery.ts`; see the [release-candidate section](#release-candidate-dogfood-2026-08-07) for the corrected output.
 
 ### `agentview inspect` — healthy render
 
@@ -164,8 +169,143 @@ Across every dogfood run AgentView **reused** the developer's existing dev serve
 
 ## Known limitations exposed by dogfooding
 
-1. **`doctor` and `inspect` use different server-discovery logic.** `doctor` probes only the configured/default port; `inspect` does full project-ownership discovery. `doctor` can therefore report a neighbour's server as "already running". Fix planned for 0.2.
+1. ~~**`doctor` and `inspect` use different server-discovery logic.**~~ **Fixed in the hardening pass** — both now use `src/server/discovery.ts`, and a regression test asserts `doctor` cannot report a foreign project's server as this project's.
 2. **Port-ownership checks depend on `lsof`.** On systems without it (some containers) ownership resolves to `unknown` and AgentView proceeds without the safety net rather than blocking. Correct behaviour, but the guarantee is weaker there.
 3. **`visibleTextLength` counts only elements visible at load.** Scroll-reveal sections that start at `opacity: 0` are excluded, so text counts understate content on animation-heavy pages. This affects the blank heuristic's inputs, though the conservative thresholds absorbed it here.
 4. **Only the first screenful is pixel-sampled.** A page that renders correctly above the fold but is broken far below would not be caught by the uniformity signal.
 5. **Mobile emulation uses Pixel 7 under Chromium.** Faithful for Android and for `pointer: coarse` media queries; it is not iOS/WebKit rendering.
+
+
+---
+
+# Release-candidate dogfood (2026-08-07)
+
+Re-run after the hardening pass that aligned `doctor` with `inspect`, added the
+`MULTIPLE_PROJECT_SERVERS` verdict, isolated OS-specific work behind
+`ProcessInspector`, and moved the localhost guard into discovery.
+
+Target again: `/Users/example/project-a` (Next.js 16.2.9),
+read-only. No `agentview setup` was run there, so its `.gitignore` was never
+touched; the only writes were to `.agentview/`, removed afterwards. Verified
+clean at the end: directory absent, zero AgentView entries in `git status`,
+`.gitignore` unchanged.
+
+## The decisive scenario
+
+The machine was in exactly the state that produces the failure this tool
+exists to prevent:
+
+| Port | Owner |
+|---|---|
+| 3000 | **A different project** (`/Users/example/project-b`) |
+| 3005 | The real example-next-app Next.js dev server |
+| 4599, 4620 | Leftover `python -m http.server` processes inside the project |
+
+`agentview doctor --no-server`, verbatim:
+
+```
+  Configured URL
+  ! http://localhost:3000 (Next.js default — not configured)
+
+  Port ownership
+  ✗ Port 3000 belongs to a different project:
+      /Users/example/project-b
+
+  Detected project server
+  ✓ Current project is listening on:
+      http://localhost:3005
+  ✓ Chosen because: matches the configured framework dev command
+  ? Also running in this project: 4599 — Python -m http.server 4599
+  ? Also running in this project: 4620 — Python -m http.server 4620
+  ! Configuration expects port 3000, but this project's server is on 3005
+
+  Recommended actions
+  1. The configured port is serving another project. Inspecting it would verify the wrong application.
+  2. Update AgentView configuration to port 3005 — run `agentview doctor --fix`.
+```
+
+Exit code `2`. Before this pass, `doctor` probed only the configured port and
+would have reported "Already running and reachable: http://localhost:3000" —
+health for someone else's application. That regression is now covered by
+`test/integration/wrong-project.test.ts`, which asserts `doctor` names the
+offending directory and does not exit 0.
+
+`agentview inspect` on the same machine state selected the correct server
+without any configuration:
+
+```
+  HEALTHY_RENDER (confidence: high)
+  URL        http://localhost:3005/
+  Server     reachable at http://localhost:3005 (reused)
+  Navigation HTTP 200
+  Render     806 visible elements, 9600 chars text
+```
+
+Exit code `0`. The desktop screenshot was opened and confirmed to be the
+Example App site (its own branding, founder quote, and the four portfolio entries)
+— not the neighbouring project.
+
+Artifacts: `docs/dogfood-artifacts/rc-healthy-report.md`,
+`docs/dogfood-artifacts/rc-doctor-output.txt`.
+
+## Scenarios covered
+
+| # | Scenario | Result |
+|---|---|---|
+| 1 | Healthy fixture | `HEALTHY_RENDER`, exit 0, both screenshots produced |
+| 2 | Broken fixtures (crash, blank, 500, 404, auth, start failure, timeout) | Correct verdict per case, exit 1 or 2 by domain |
+| 3 | Configured port occupied by another project | Refused; `doctor` fails with the offending directory named |
+| 4 | Project's real server on a different port | Found by directory attribution, no configuration needed |
+| 5 | Real example-next-app project, read-only | As above; cleaned up, `git status` unchanged |
+
+Scenarios 1–4 are automated in `test/integration/`, so they cannot silently
+regress. Scenario 3 in particular spawns a real child process with an explicit
+working directory rather than simulating one.
+
+## New findings from this pass
+
+**A missing dev command was reported too early.** `inspect` bailed with
+`DEV_COMMAND_NOT_FOUND` before discovery ran, so a project whose server was
+already running still failed if it had no dev script. The check now happens
+only when nothing is running and AgentView actually needs to start something.
+
+**`doctor` could contact a remote host.** It probed a configured URL without
+checking it was localhost, so a remote `url` in `.agentview/config.json` would
+have been contacted without `--allow-remote`. The guard now lives inside
+`discoverServers`, the only code that makes requests, so no caller can bypass
+it. Covered by a test using an unroutable TEST-NET-3 address.
+
+**Redaction was verified adversarially, with a negative control.** A fixture
+leaks fake secrets through `authorization`, `cookie`, `x-api-key`,
+`x-csrf-token`, and query parameters; every generated artifact is then scanned
+for them. To confirm the test has teeth rather than passing vacuously, the same
+fixture was run with `redact: false` — the secrets *do* appear in
+`network.json`, proving redaction is what removes them.
+
+**`watch` could orphan a dev server.** It had no signal handling, so an
+interrupt during an inspection could leave a spawned server running. It now
+finishes the in-flight run before exiting, with a second Ctrl-C to force.
+
+**CLI output leaked absolute paths** and `setup` reported success even when it
+had found no dev command — moving the failure to the next command instead of
+naming it.
+
+## Limitations confirmed, not fixed
+
+1. **Scroll-reveal content is not counted or captured.** The example-next-app
+   full-page screenshot shows large empty regions because sections start at
+   `opacity: 0` and animate in on scroll. AgentView captures the page as it is
+   at load, so `visibleTextLength` understates content on animation-heavy
+   pages. The conservative blank thresholds absorb this, but a page whose
+   content *only* appears after scrolling would look sparser than it is.
+2. **Port-ownership checks depend on OS process inspection.** Where
+   unavailable, ownership is `unknown` and AgentView proceeds without the
+   safety net rather than blocking. Windows has no implementation at all — see
+   `docs/PLATFORM_SUPPORT.md`.
+3. **Only the first screenful is pixel-sampled**, so breakage far below the
+   fold is not caught by the uniformity signal.
+4. **Mobile emulation is Pixel 7 under Chromium** — faithful for Android and
+   for `pointer: coarse`, not iOS/WebKit.
+5. **`doctor --no-server` was used** for the read-only runs above. The
+   server-starting path is exercised by the integration suite rather than
+   against the developer's live project.

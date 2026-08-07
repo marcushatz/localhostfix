@@ -9,6 +9,34 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
 
 ## [Unreleased]
 
+### Changed — pre-release hardening (2026-08-07)
+
+- `doctor` and `inspect` now share one authoritative server-discovery module.
+  `doctor` previously probed only the configured port and could therefore
+  report a project as healthy because *something* answered there.
+- New `MULTIPLE_PROJECT_SERVERS` verdict: when several servers run inside the
+  project and none is clearly the dev server, AgentView reports the ambiguity
+  and asks for `--url` instead of guessing.
+- A missing dev command is now an error only when no project server is
+  already running.
+- OS-specific work moved behind a `ProcessInspector` interface
+  (`src/platform/`), with a `/proc`-based Linux implementation and an explicit
+  unsupported implementation for Windows.
+- CLI polish: relative artifact paths, honest `setup` guidance when a project
+  cannot be inspected yet, clearer `status` wording, and graceful `watch`
+  shutdown that cannot orphan a dev server.
+
+### Fixed — pre-release hardening (2026-08-07)
+
+- `doctor` probed a configured URL without checking it was localhost. The
+  guard now lives inside discovery, the only code that makes requests.
+
+### Security
+
+- Adversarial redaction tests leak fake secrets through authorization headers,
+  cookies, `x-api-key`, `x-csrf-token`, and query parameters, then scan every
+  generated artifact. Verified non-vacuous by a negative control.
+
 ### Added — 0.1.0 (not yet released)
 
 - `agentview inspect` — one-shot rendered-frontend verification producing
@@ -34,6 +62,10 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
   bodies are never stored.
 - Claude Code project skill plus optional loop-safe automatic verification
   hooks, installed to `.claude/settings.local.json` by default.
-- 72 tests spanning unit, integration, and hook end-to-end coverage.
+- 95 tests spanning unit, integration, and hook end-to-end coverage.
+- GitHub Actions CI with three tiers that do not pretend to be each other:
+  code compatibility, browser integration, and OS-specific server discovery.
+- `docs/PLATFORM_SUPPORT.md` (Verified/Expected/Untested/Unsupported per
+  feature) and `docs/NAMING.md` (the unresolved naming blocker).
 
 [Unreleased]: https://example.invalid/compare

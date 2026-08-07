@@ -1,16 +1,55 @@
 # AgentView
 
-**AgentView verifies that your coding agent can inspect the frontend it is changing.** It starts or finds the local development server, opens the rendered application in Chromium, captures browser evidence, and explains which layer failed when inspection does not work.
+**AgentView verifies that your coding agent is inspecting the frontend belonging to the project it is actually editing — not merely any healthy page answering on localhost.**
 
-> Status: 0.1, macOS-first, not yet published. See [Limitations](#known-limitations).
+More broadly: it verifies that coding agents can inspect the rendered frontend they are changing, captures browser evidence, and identifies which layer failed when they cannot.
+
+> Status: 0.1 release candidate. macOS is the only verified platform. Nothing is published yet.
+> **The name is unresolved** — `agentview` is taken on npm by a package that ships a CLI binary of the same name, and a similarly-named tool exists in this category. See [docs/NAMING.md](docs/NAMING.md) and [Limitations](#known-limitations).
 
 ## The problem
 
-A coding agent edits your frontend, tries to look at localhost, and something in the chain quietly fails — wrong port, dev server not ready, Chromium missing, the route crashes, the page is blank, or the browser integration returns nothing useful. The agent falls back to reading source code, assumes the page looks right, and keeps going. You open a real browser and find something obviously broken.
+A coding agent edits your frontend, tries to look at localhost, and something in the chain quietly fails — wrong port, dev server not ready, Chromium missing, the route crashes, the page is blank. The agent falls back to reading source code, assumes the page looks right, and keeps going. You open a real browser and find something obviously broken.
 
-Then you debug the chain by hand: did the server start? which port? does the route exist? is Playwright installed? did JavaScript crash? did an API fail? is there an auth wall? did the agent actually receive a screenshot?
+There is a worse version of this, and it is why AgentView exists.
 
-AgentView turns that into one command that produces evidence and names the layer that failed.
+### A healthy page is not evidence
+
+This is real output from developing this tool, against a real Next.js project:
+
+```
+HEALTHY_RENDER (confidence: high)
+URL        http://localhost:3000/
+Navigation HTTP 200
+Render     59 visible elements, 549 chars text
+```
+
+Green result, HTTP 200, hundreds of elements, no console errors. **It was the wrong application.** Port 3000 belonged to an unrelated project that happened to be running; the project actually being edited was on port 3005. Nothing in the verdict, the status code, or the element counts revealed it. Only opening the screenshot did.
+
+Framework default ports collide constantly. If you keep more than one project running — and most people do — then "something answered on localhost:3000" tells you nothing about *whose* frontend you just verified.
+
+AgentView establishes server identity from the listening process itself: its working directory first, its command line second. Same situation today:
+
+```
+$ agentview doctor
+
+  Configured URL
+  ! http://localhost:3000 (Next.js default — not configured)
+
+  Port ownership
+  ✗ Port 3000 belongs to a different project:
+      /Users/example/project-b
+
+  Detected project server
+  ✓ Current project is listening on:
+      http://localhost:3005
+  ✓ Chosen because: matches the configured framework dev command
+  ? Also running in this project: 4620 — Python -m http.server 4620
+
+  Recommended actions
+  1. The configured port is serving another project. Inspecting it would verify the wrong application.
+  2. Update AgentView configuration to port 3005 — run `agentview doctor --fix`.
+```
 
 ## Before and after
 
@@ -30,7 +69,7 @@ $ agentview inspect
   APPLICATION_RUNTIME_FAILURE (confidence: high)
 
   URL        http://localhost:3005/
-  Server     reachable at http://localhost:3005 (reused)
+  Server     reachable at http://localhost:3005
   Browser    Chromium launched
   Navigation HTTP 200
   Render     2 visible elements, 0 chars text
@@ -45,21 +84,20 @@ $ agentview inspect
   bug, not a tooling problem.
 ```
 
-The agent reads that report, sees the crash, and fixes the actual bug instead of restyling a page it cannot see.
-
 ## What this is, and is not
 
-AgentView is the reliability, diagnosis, and artifact layer **around** existing browser tooling. It is not a replacement for Playwright, not a new browser-automation framework, and not an AI design critic. No API key is needed; every check is deterministic and works offline.
+AgentView is the reliability, identity, and diagnosis layer **around** existing browser tooling. It is not a replacement for Playwright, not a browser-automation framework, and not an AI design critic. No API key is needed; every check is deterministic and works offline.
 
-Playwright itself now ships an agent-oriented CLI (`npx playwright cli`) and an MCP server, and they are good. They are **interactive and session-oriented** — the agent opens a session, acts, observes, acts again. AgentView is **one-shot and deterministic**: boot or find the server, capture a fixed evidence bundle, classify the failure by layer, write durable artifacts, exit with a meaningful status code. Different shape, different job. AgentView can detect and validate a Playwright MCP setup, but never requires one.
+Playwright itself ships an agent-oriented CLI (`npx playwright cli`) and an MCP server, and they are good at what they do. They are **interactive and session-oriented** — the agent opens a session, acts, observes, acts again. AgentView is **one-shot and deterministic**: find the server that belongs to this project, capture a fixed evidence bundle, classify the failure by layer, write durable artifacts, exit with a meaningful status code. Different shape, different job.
 
 ### What it honestly does
 
-- Verifies the dev server is reachable, and finds it **on whatever port it actually landed on**
+- Establishes which local server belongs to the project being edited, and refuses to inspect one that does not
+- Finds that server **on whatever port it actually landed on**, without configuration
 - Verifies Chromium can launch, navigate, and render
 - Captures desktop and mobile screenshots plus structured diagnostics
 - Separates browser/setup failures from application/runtime failures
-- Applies only clearly safe automated fixes, each recorded and reversible
+- Reports ambiguity instead of guessing when several servers are plausible
 - Marks uncertain conclusions as uncertain
 
 ### What it does not claim
@@ -70,7 +108,8 @@ Playwright itself now ships an agent-oriented CLI (`npx playwright cli`) and an 
 - It does not bypass authentication, CAPTCHAs, or platform security
 - It is not safe for production apps holding sensitive data
 - It cannot prove a visually sparse page is accidentally blank
-- It does not make Playwright MCP unnecessary in every use case
+- It does not detect, configure, or validate Playwright MCP — that is not implemented
+- It cannot verify server identity where OS process inspection is unavailable, including on Windows; it reports that as unknown rather than guessing
 
 ## Installation
 
@@ -113,7 +152,7 @@ Artifacts land in `.agentview/latest/` (and a timestamped directory under `.agen
 | `agentview status` | Show config, integration state, and the last result |
 | `agentview clean` | Delete generated runs, artifacts, and state |
 
-Useful flags: `--headed` (visible browser), `--json` (machine-readable report on stdout), `--url` (explicit URL), `--allow-remote` (permit non-localhost — see [Privacy](docs/PRIVACY.md)), `--allow-foreign-server` (accept a server belonging to another project).
+Useful flags: `--headed` (visible browser), `--json` (machine-readable report on stdout), `--url` (explicit URL, which also resolves ambiguity), `--allow-remote` (permit non-localhost — see [Privacy](docs/PRIVACY.md)), `--allow-foreign-server` (deliberately accept a server belonging to another project).
 
 ### Setup options
 
@@ -125,7 +164,7 @@ Useful flags: `--headed` (visible browser), `--json` (machine-readable report on
 |---|---|
 | `0` | Healthy render |
 | `1` | Application problem (crash, blank, failed API, missing route, auth gate) |
-| `2` | Setup/environment problem (server, port, browser) |
+| `2` | Setup/environment problem (server, port, browser, ambiguous servers) |
 | `3` | Indeterminate |
 | `4` | CLI usage error |
 
@@ -159,56 +198,62 @@ Hooks go to `.claude/settings.local.json` by default — personal and git-ignore
 ## How it works
 
 ```
-project config → dev server → network → browser → navigation
-   → application → data/API → rendered interface → agent artifacts
+project config → server identity → dev server → network → browser
+   → navigation → application → data/API → rendered interface
 ```
 
-Each verdict is attributed to one layer, and the report's `domain` field says whether it is a **setup** problem (fix the environment) or an **application** problem (fix your code). Verdicts include `HEALTHY_RENDER`, `LIKELY_BLANK_RENDER`, `PARTIAL_RENDER`, `APPLICATION_RUNTIME_FAILURE`, `FAILED_DEPENDENCY_REQUEST`, `ROUTE_NOT_FOUND`, `AUTHENTICATION_GATE`, `NAVIGATION_FAILED`, `BROWSER_NOT_INSTALLED`, `BROWSER_LAUNCH_FAILED`, `SERVER_START_FAILED`, `SERVER_START_TIMEOUT`, `SERVER_PORT_CONFLICT`, `DEV_COMMAND_NOT_FOUND`, and `INDETERMINATE`.
+Each verdict is attributed to one layer, and the report's `domain` field says whether it is a **setup** problem (fix the environment) or an **application** problem (fix your code). Verdicts include `HEALTHY_RENDER`, `LIKELY_BLANK_RENDER`, `PARTIAL_RENDER`, `APPLICATION_RUNTIME_FAILURE`, `FAILED_DEPENDENCY_REQUEST`, `ROUTE_NOT_FOUND`, `AUTHENTICATION_GATE`, `NAVIGATION_FAILED`, `BROWSER_NOT_INSTALLED`, `BROWSER_LAUNCH_FAILED`, `SERVER_START_FAILED`, `SERVER_START_TIMEOUT`, `SERVER_PORT_CONFLICT`, `MULTIPLE_PROJECT_SERVERS`, `DEV_COMMAND_NOT_FOUND`, and `INDETERMINATE`.
 
 Blank-page detection is multi-signal and deliberately conservative — DOM text and element counts, empty app roots, page errors, failed requests, screenshot uniformity, loading indicators, framework error overlays. It reports `true`, `false`, or `uncertain` with confidence and the reasons listed, because an intentionally minimal page looks a lot like a broken one.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design and the research behind it.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and the research behind it.
 
 ## Supported environments
 
+Support labels are used strictly. "The unit tests pass on that OS" is not support — see [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md) for the per-feature matrix.
+
 | | Status |
 |---|---|
-| macOS | Supported and tested |
-| Linux / Windows | Should mostly work; port-ownership checks need `lsof`. Untested |
+| macOS | **Verified** — the full suite runs here |
+| Linux | **Expected** — implemented via `/proc` with an `lsof` fallback, parsers unit-tested against captured output, never run on a Linux host |
+| Windows | **Server identity unsupported.** No `lsof` or `/proc`; ownership is reported as unknown rather than approximated. The rest is untested |
 | Next.js, Vite | Supported adapters |
 | Other Node projects | Generic adapter via a configured dev command |
 | Chromium | Supported |
-| Firefox / WebKit | Not yet |
+| Firefox / WebKit | Not supported |
 | Claude Code | Supported integration |
 | Other agents | Core CLI is agent-agnostic; integrations welcome |
 
 ## Privacy
 
-No telemetry, no network calls, nothing transmitted. Localhost only unless you explicitly opt out. Secrets in headers and query parameters are redacted from saved network data, and request/response bodies are never stored. **Screenshots can contain whatever is on screen, including private data** — artifacts are git-ignored by default. See [docs/PRIVACY.md](docs/PRIVACY.md) and [docs/SECURITY.md](docs/SECURITY.md).
+No telemetry, no network calls, nothing transmitted. The only requests AgentView makes are to the local server being inspected. Localhost only unless you explicitly opt out. Secrets in headers and query parameters are redacted from saved network data, and request/response bodies are never stored. **Screenshots can contain whatever is on screen, including private data** — artifacts are git-ignored by default. See [docs/PRIVACY.md](docs/PRIVACY.md) and [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Known limitations
 
-- **macOS-first.** Other platforms are not yet tested.
-- **`doctor` and `inspect` discover servers differently.** `doctor` probes the configured/default port only; `inspect` does full project-ownership discovery and can therefore find servers `doctor` misses. Being aligned in 0.2.
-- **Port-ownership verification needs `lsof`.** Without it, ownership is `unknown` and AgentView proceeds without that safety net.
+- **macOS is the only verified platform.** Linux is implemented but unverified; Windows cannot verify server identity at all.
+- **Server identity depends on OS process inspection.** Without it, AgentView reports ownership as unknown and proceeds without that safety net.
 - **Rendered is not correct.** `HEALTHY_RENDER` means the page rendered. Judging whether it *looks right* still requires looking at the screenshots.
-- **Blank detection is a heuristic.** It is tuned to avoid false alarms, so it will report `uncertain` rather than guess.
+- **Blank detection is a heuristic**, tuned to avoid false alarms; it reports `uncertain` rather than guessing.
 - **Visible-text counts exclude scroll-reveal content** that starts at `opacity: 0`.
+- **Only the first screenful is pixel-sampled**, so a page broken far below the fold is not caught by the uniformity signal.
 - **Mobile emulation is Pixel 7 under Chromium** — faithful for Android, not iOS/WebKit.
 - **Single route per run.** Multi-route inspection is planned.
 - **Authenticated routes are reported, not entered.**
+- **No Playwright MCP integration.** Detecting or configuring MCP is not implemented.
 
 ## Troubleshooting
 
 **"Chromium executable unavailable"** — run `npx playwright install chromium`.
 
-**"SERVER_PORT_CONFLICT"** — something else owns the port your dev server advertised. Stop it, or set `url`/`expectedPort` in `.agentview/config.json`. AgentView will not kill a process it did not start.
+**AgentView says port N belongs to a different project** — it does. Something else is serving that port, and inspecting it would verify the wrong app. Stop it, or point AgentView at the right port with `--url` or `expectedPort`.
 
-**AgentView inspected the wrong app** — it now verifies that a server belongs to your project before reusing it. If you *want* a server from another directory, pass `--allow-foreign-server`.
+**"MULTIPLE_PROJECT_SERVERS"** — several servers are running inside your project directory and none is clearly the dev server. Re-run with `--url http://localhost:<port>`, or stop the ones you are not using. AgentView will not guess.
+
+**"SERVER_PORT_CONFLICT"** — the dev server advertised a port that something else already owns. AgentView will not kill a process it did not start.
 
 **"SERVER_START_TIMEOUT"** — the dev server is slow or prints an unrecognised URL. Raise `startupTimeoutMs` or set `url` explicitly.
 
-**The report says the page is blank but it looks fine** — check `likelyBlank` and its reasons in `report.json`; `uncertain` means AgentView is telling you it could not decide.
+**"Process inspection unavailable"** — `lsof`/`proc` could not be used, so ownership cannot be verified. Results are still produced, but without the wrong-project safety net.
 
 **Hooks are not firing** — run `agentview doctor` to confirm the skill and hook are installed and `autoInspect` is not `off`.
 
@@ -217,15 +262,17 @@ No telemetry, no network calls, nothing transmitted. Localhost only unless you e
 ```bash
 npm install
 npm run build
-npm test              # 72 tests: unit, integration, and hook end-to-end
+npm test                  # full suite
+npm run test:unit         # fast, no browser or servers
+npm run test:integration  # real dev servers and real Chromium
 npm run typecheck
 ```
 
-Integration tests start real dev servers and launch real Chromium against fixture projects in temporary directories. No test touches an external website.
+95 tests across unit, integration, and hook end-to-end coverage. Integration tests start real dev servers and launch real Chromium against fixture projects in temporary directories; the wrong-project suite spawns real child processes with explicit working directories to prove server identity works. No test touches an external website.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Adding a framework means implementing one `FrameworkAdapter`; adding an agent integration means one module under `src/integrations/`.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Adding a framework means implementing one `FrameworkAdapter`; adding a platform means implementing one `ProcessInspector`; adding an agent integration means one module under `src/integrations/`.
 
 ## License
 
