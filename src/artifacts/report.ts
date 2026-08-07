@@ -87,6 +87,7 @@ const VERDICT_HEADLINES: Record<Verdict, string> = {
   SERVER_START_TIMEOUT: 'The development server did not become ready in time',
   SERVER_UNREACHABLE: 'The development server is not reachable',
   SERVER_PORT_CONFLICT: 'The advertised port is served by a process AgentView did not start',
+  MULTIPLE_PROJECT_SERVERS: 'Several servers are running in this project and AgentView will not guess',
   PORT_MISMATCH: 'The server is running on a different port than configured',
   BROWSER_NOT_INSTALLED: 'Chromium is not installed for Playwright',
   BROWSER_LAUNCH_FAILED: 'Chromium failed to launch',

@@ -6,7 +6,7 @@ import { loadConfig, saveConfig } from '../config/config.js';
 import { findProjectRoot, detectPackageManager, runScriptCommand } from '../project/discover.js';
 import { adapterById, detectDevScript, detectFramework } from '../frameworks/adapter.js';
 import { ensureServer } from '../server/lifecycle.js';
-import { probeUrl } from '../server/probe.js';
+import { describeCandidate, describeSelection, discoverServers } from '../server/discovery.js';
 import { checkBrowserInstalled, launchChromium } from '../browser/driver.js';
 import { claudeIntegrationStatus } from '../integrations/claude.js';
 
@@ -112,26 +112,75 @@ export async function runDoctor(opts: {
     note(projectSection, 'warn', 'No AgentView config yet (defaults in use) — run `agentview setup`');
   }
 
-  // ── Server ───────────────────────────────────────────────────────────
-  const serverSection: Section = { title: 'Server', findings: [] };
-  sections.push(serverSection);
+  // ── Configured URL ───────────────────────────────────────────────────
   const expectedPort = config.expectedPort ?? adapter.defaultPort;
+  const configuredUrl = config.url ?? (expectedPort ? `http://localhost:${expectedPort}` : null);
+  const configuredSection: Section = { title: 'Configured URL', findings: [] };
+  sections.push(configuredSection);
+  if (configuredUrl) {
+    note(configuredSection, config.url || config.expectedPort ? 'ok' : 'warn',
+      `${configuredUrl}${config.url ? '' : config.expectedPort ? '' : ` (${adapter.displayName} default — not configured)`}`);
+  } else {
+    note(configuredSection, 'warn', 'No URL or port configured; AgentView will discover one');
+  }
+
+  // ── Port ownership ───────────────────────────────────────────────────
+  // The same discovery `inspect` uses, so the two commands can never
+  // disagree about which server belongs to this project.
+  const discovery = await discoverServers({
+    projectRoot: project.root,
+    adapter,
+    configuredUrl: config.url,
+    configuredPort: expectedPort ?? undefined,
+  });
+
+  const ownershipSection: Section = { title: 'Port ownership', findings: [] };
+  sections.push(ownershipSection);
+  if (discovery.ownershipUnavailable) {
+    note(ownershipSection, 'unknown',
+      'Process inspection unavailable on this system (lsof missing or restricted) — AgentView cannot verify which project owns a port');
+  } else if (discovery.foreignServers.length > 0) {
+    for (const foreign of discovery.foreignServers) {
+      note(ownershipSection, 'fail',
+        `Port ${foreign.port} belongs to a different project:\n      ${foreign.cwd ?? '(directory unreadable)'}`);
+    }
+    recommendations.push(
+      'The configured port is serving another project. Inspecting it would verify the wrong application.',
+    );
+  } else if (configuredUrl) {
+    const port = expectedPort;
+    const owned = discovery.projectServers.some((s) => s.port === port);
+    if (owned) note(ownershipSection, 'ok', `Port ${port} is owned by this project`);
+    else note(ownershipSection, 'ok', `Port ${port} is not occupied by another project`);
+  }
+
+  // ── Detected project server ──────────────────────────────────────────
+  const serverSection: Section = { title: 'Detected project server', findings: [] };
+  sections.push(serverSection);
   let actualUrl: string | null = null;
 
-  const candidates = [
-    ...(config.url ? [config.url] : []),
-    ...(expectedPort ? [`http://localhost:${expectedPort}`] : []),
-  ];
-  for (const url of candidates) {
-    const probe = await probeUrl(url, 1500);
-    if (probe.ok) {
-      actualUrl = url;
-      note(serverSection, 'ok', `Already running and reachable: ${url} (HTTP ${probe.status})`);
-      break;
+  if (discovery.ambiguous) {
+    note(serverSection, 'fail',
+      `${discovery.projectServers.length} servers are listening inside this project and none is clearly the dev server:`);
+    for (const c of discovery.projectServers) {
+      note(serverSection, 'unknown', `    ${describeCandidate(c)}`);
+    }
+    if (discovery.preferred) {
+      note(serverSection, 'unknown', `    best guess: port ${discovery.preferred.port}`);
+    }
+    recommendations.push(
+      'Several servers are running here. Re-run with `--url http://localhost:<port>` or stop the ones you are not using.',
+    );
+  } else if (discovery.selected) {
+    actualUrl = discovery.selected.url;
+    note(serverSection, 'ok', `Current project is listening on:\n      ${actualUrl}`);
+    note(serverSection, 'ok', `Chosen because: ${describeSelection(discovery)}`);
+    for (const other of discovery.projectServers.filter((s) => s.url !== actualUrl)) {
+      note(serverSection, 'unknown', `Also running in this project: ${describeCandidate(other)}`);
     }
   }
 
-  if (!actualUrl && devCommand && opts.startServer) {
+  if (!actualUrl && !discovery.ambiguous && devCommand && opts.startServer) {
     note(serverSection, 'action', `Starting dev server to verify it works: ${devCommand}`);
     const result = await ensureServer({
       command: devCommand,
@@ -155,21 +204,21 @@ export async function runDoctor(opts: {
       note(serverSection, 'fail', `Dev server did not become reachable within ${config.startupTimeoutMs}ms`);
       recommendations.push('Increase "startupTimeoutMs" or set "url" explicitly in .agentview/config.json.');
     }
-  } else if (!actualUrl && !opts.startServer) {
-    note(serverSection, 'unknown', 'Not running; server start skipped (--no-server)');
-  } else if (!actualUrl && !devCommand) {
-    note(serverSection, 'fail', 'Server not reachable and no dev command to start it');
+  } else if (!actualUrl && !discovery.ambiguous && !opts.startServer) {
+    note(serverSection, 'unknown', 'No server running for this project; start skipped (--no-server)');
+  } else if (!actualUrl && !discovery.ambiguous && !devCommand) {
+    note(serverSection, 'fail', 'No server running for this project, and no dev command to start one');
   }
 
   if (actualUrl && expectedPort) {
     const actualPort = Number(new URL(actualUrl).port || 80);
     if (actualPort !== expectedPort) {
-      note(serverSection, 'warn', `Configuration expects port ${expectedPort} but the server answers on ${actualPort}`);
+      note(serverSection, 'warn', `Configuration expects port ${expectedPort}, but this project's server is on ${actualPort}`);
       if (opts.fix) {
         saveConfig(project.root, { ...config, expectedPort: actualPort });
         note(serverSection, 'ok', `Fixed: stored expectedPort ${actualPort} in .agentview/config.json (undo: edit the file)`);
       } else {
-        recommendations.push(`Update AgentView's stored port to ${actualPort} (run \`agentview doctor --fix\`).`);
+        recommendations.push(`Update AgentView configuration to port ${actualPort} — run \`agentview doctor --fix\`.`);
       }
     }
   }

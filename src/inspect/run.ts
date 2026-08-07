@@ -6,6 +6,7 @@ import type { AgentViewConfig } from '../config/schema.js';
 import { findProjectRoot, detectPackageManager, runScriptCommand } from '../project/discover.js';
 import { adapterById, detectDevScript, detectFramework, type FrameworkAdapter } from '../frameworks/adapter.js';
 import { ensureServer, writeServerLog, type ServerHandle } from '../server/lifecycle.js';
+import { describeCandidate } from '../server/discovery.js';
 import { isLocalUrl } from '../server/probe.js';
 import { checkBrowserInstalled, launchChromium } from '../browser/driver.js';
 import { collectRoute } from './collect.js';
@@ -75,15 +76,6 @@ export async function runInspection(opts: InspectOptions): Promise<InspectOutcom
       },
     ], 'Run `agentview setup` inside a Node.js project, or set "url"/"devCommand" in .agentview/config.json.');
   }
-  if (!devCommand && !explicitUrl) {
-    return builder.finish('DEV_COMMAND_NOT_FOUND', 'high', [
-      {
-        kind: 'no-dev-script',
-        detail: `package.json has no ${adapter.devScriptCandidates.map((s) => `"${s}"`).join('/')} script and no devCommand is configured`,
-      },
-    ], 'Add a dev script to package.json or set "devCommand" in .agentview/config.json.');
-  }
-
   // Privacy guard: refuse non-local URLs unless explicitly allowed.
   if (explicitUrl && !isLocalUrl(explicitUrl) && !(opts.allowRemote ?? config.allowRemote)) {
     return builder.finish('PROJECT_NOT_RECOGNIZED', 'high', [
@@ -106,6 +98,30 @@ export async function runInspection(opts: InspectOptions): Promise<InspectOutcom
       startupTimeoutMs: config.startupTimeoutMs,
     });
     if (!result.ok) {
+      if (result.kind === 'DEV_COMMAND_NOT_FOUND') {
+        return builder.finish('DEV_COMMAND_NOT_FOUND', 'high', [
+          {
+            kind: 'no-dev-script',
+            detail: `no server is running for this project, and package.json has no ${adapter.devScriptCandidates.map((s) => `"${s}"`).join('/')} script`,
+          },
+        ], 'Start your dev server, add a dev script to package.json, or set "devCommand" in .agentview/config.json.');
+      }
+      if (result.kind === 'MULTIPLE_PROJECT_SERVERS') {
+        const d = result.discovery;
+        return builder.finish('MULTIPLE_PROJECT_SERVERS', 'high', [
+          {
+            kind: 'ambiguous-servers',
+            detail: `${d.projectServers.length} servers are listening inside this project and none is clearly the dev server.`,
+          },
+          ...d.projectServers.map((c) => ({
+            kind: 'candidate',
+            detail: describeCandidate(c),
+          })),
+          ...(d.preferred
+            ? [{ kind: 'preferred', detail: `Best guess: port ${d.preferred.port}` }]
+            : []),
+        ], `AgentView will not guess which server is your app. Re-run with --url http://localhost:<port>, or stop the servers you are not using.`);
+      }
       fs.writeFileSync(path.join(runDir, 'server.log'), result.log);
       builder.artifacts.serverLog = 'server.log';
       if (result.kind === 'SERVER_START_FAILED') {

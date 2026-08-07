@@ -165,6 +165,60 @@ export function findProjectServers(projectRoot: string): ProjectServer[] {
   return found;
 }
 
+export interface ProcessDetail {
+  cwd: string | null;
+  commandLine: string | null;
+}
+
+/**
+ * Working directory and command line for many PIDs in two subprocess calls
+ * rather than two per PID. Discovery inspects every listening process, so the
+ * per-PID version made `doctor` noticeably slow on a busy machine.
+ */
+export function processDetails(pids: number[]): Map<number, ProcessDetail> {
+  const out = new Map<number, ProcessDetail>();
+  if (pids.length === 0) return out;
+  const list = pids.join(',');
+
+  const cwds = new Map<number, string>();
+  try {
+    const raw = execFileSync('lsof', ['-a', '-p', list, '-d', 'cwd', '-Fpn'], {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    let pid: number | null = null;
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('p')) pid = Number(line.slice(1));
+      else if (line.startsWith('n') && pid !== null) cwds.set(pid, line.slice(1));
+    }
+  } catch {
+    /* unavailable: cwd stays null, callers treat that as "unknown" */
+  }
+
+  const commands = new Map<number, string>();
+  try {
+    const raw = execFileSync('ps', ['-o', 'pid=,command=', '-p', list], {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    for (const line of raw.split('\n')) {
+      const match = line.trim().match(/^(\d+)\s+(.*)$/);
+      if (match?.[1] && match[2]) commands.set(Number(match[1]), match[2].trim());
+    }
+  } catch {
+    /* unavailable */
+  }
+
+  for (const pid of pids) {
+    const cwd = cwds.get(pid) ?? null;
+    const commandLine = commands.get(pid) ?? null;
+    if (cwd !== null || commandLine !== null) out.set(pid, { cwd, commandLine });
+  }
+  return out;
+}
+
 /** Working directory of a process, via lsof. Null when it cannot be read. */
 export function processCwd(pid: number): string | null {
   try {
