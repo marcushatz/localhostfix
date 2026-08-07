@@ -101,7 +101,7 @@ export const posixInspector: ProcessInspector = {
   },
 
   killTree(pid: number, signal): void {
-    // Negative PID signals the whole process group. AgentView spawns dev
+    // Negative PID signals the whole process group. LocalhostFix spawns dev
     // servers detached precisely so their children die with them.
     try {
       process.kill(-pid, signal);

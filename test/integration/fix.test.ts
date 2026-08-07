@@ -15,7 +15,7 @@ import {
 } from '../fixtures/servers.js';
 
 /**
- * `agentview fix` must repair only what it owns, never touch application
+ * `localhostfix fix` must repair only what it owns, never touch application
  * source, and never claim success without a verifying inspection.
  */
 
@@ -32,8 +32,8 @@ function fixture(name: string, source: string, config?: Record<string, unknown>)
   const f = makeFixture(name, source);
   fixtures.push(f);
   if (config) {
-    fs.mkdirSync(path.join(f.dir, '.agentview'), { recursive: true });
-    fs.writeFileSync(path.join(f.dir, '.agentview', 'config.json'), JSON.stringify(config));
+    fs.mkdirSync(path.join(f.dir, '.localhostfix'), { recursive: true });
+    fs.writeFileSync(path.join(f.dir, '.localhostfix', 'config.json'), JSON.stringify(config));
   }
   return f.dir;
 }
@@ -95,7 +95,7 @@ function freePort(): Promise<number> {
   );
 }
 
-describe('fix repairs what AgentView owns', () => {
+describe('fix repairs what LocalhostFix owns', () => {
   test(
     'a wrong configured port is corrected and the result is verified',
     async () => {
@@ -127,7 +127,7 @@ describe('fix repairs what AgentView owns', () => {
 
       expect(result.outcome).toBe('ALREADY_HEALTHY');
       expect(result.finalReport.verdict).toBe('HEALTHY_RENDER');
-      expect(result.finalReport.server.startedByAgentView).toBe(true);
+      expect(result.finalReport.server.startedByLocalhostFix).toBe(true);
       expect(result.finalReport.render.visibleElementCount).toBeGreaterThan(0);
     },
     TIMEOUT,
@@ -137,7 +137,7 @@ describe('fix repairs what AgentView owns', () => {
     'a stale inspection lock is cleared',
     async () => {
       const dir = fixture('fix-lock', serverSource(HEALTHY_HANDLER));
-      const stateDir = path.join(dir, '.agentview', 'state');
+      const stateDir = path.join(dir, '.localhostfix', 'state');
       fs.mkdirSync(stateDir, { recursive: true });
       const lock = path.join(stateDir, 'inspect.lock');
       fs.writeFileSync(lock, '999999');
@@ -154,11 +154,11 @@ describe('fix repairs what AgentView owns', () => {
   );
 
   test(
-    'a corrupt AgentView config is backed up and regenerated',
+    'a corrupt LocalhostFix config is backed up and regenerated',
     async () => {
       const dir = fixture('fix-config', serverSource(HEALTHY_HANDLER));
-      fs.mkdirSync(path.join(dir, '.agentview'), { recursive: true });
-      const configFile = path.join(dir, '.agentview', 'config.json');
+      fs.mkdirSync(path.join(dir, '.localhostfix'), { recursive: true });
+      const configFile = path.join(dir, '.localhostfix', 'config.json');
       fs.writeFileSync(configFile, '{ this is not json');
 
       const result = await runFix({ cwd: dir });
@@ -166,9 +166,9 @@ describe('fix repairs what AgentView owns', () => {
       const applied = result.fixesApplied.find((f) => f.id === 'invalid-config');
       expect(applied?.succeeded).toBe(true);
       // The broken file is preserved rather than destroyed.
-      const backups = fs.readdirSync(path.join(dir, '.agentview')).filter((f) => f.includes('.invalid-'));
+      const backups = fs.readdirSync(path.join(dir, '.localhostfix')).filter((f) => f.includes('.invalid-'));
       expect(backups).toHaveLength(1);
-      expect(fs.readFileSync(path.join(dir, '.agentview', backups[0]!), 'utf8')).toBe('{ this is not json');
+      expect(fs.readFileSync(path.join(dir, '.localhostfix', backups[0]!), 'utf8')).toBe('{ this is not json');
       expect(() => JSON.parse(fs.readFileSync(configFile, 'utf8'))).not.toThrow();
       expect(applied?.undo).toMatch(/restore/i);
     },
@@ -187,7 +187,7 @@ describe('fix repairs what AgentView owns', () => {
       const first = await runFix({ cwd: dir });
       expect(first.fixesApplied.length).toBeGreaterThan(0);
 
-      const configAfterFirst = fs.readFileSync(path.join(dir, '.agentview', 'config.json'), 'utf8');
+      const configAfterFirst = fs.readFileSync(path.join(dir, '.localhostfix', 'config.json'), 'utf8');
       const second = await runFix({ cwd: dir });
 
       // A second run may still correct the port, because a fixture server
@@ -247,7 +247,7 @@ describe('fix refuses to act where it cannot be confident', () => {
   test(
     'a missing browser is never installed silently',
     async () => {
-      const emptyCache = fs.mkdtempSync(path.join(os.tmpdir(), 'agentview-nobrowser-'));
+      const emptyCache = fs.mkdtempSync(path.join(os.tmpdir(), 'localhostfix-nobrowser-'));
       cleanups.push(() => fs.rmSync(emptyCache, { recursive: true, force: true }));
       const dir = fixture('fix-nobrowser', serverSource(HEALTHY_HANDLER));
 
@@ -319,8 +319,8 @@ describe('fix refuses to act where it cannot be confident', () => {
     'a server owned by another process is never terminated',
     async () => {
       // A neighbour's server occupies the configured port. Killing it would
-      // be the "easy fix" and is exactly what AgentView must not do.
-      const foreignDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentview-neighbour-'));
+      // be the "easy fix" and is exactly what LocalhostFix must not do.
+      const foreignDir = fs.mkdtempSync(path.join(os.tmpdir(), 'localhostfix-neighbour-'));
       cleanups.push(() => fs.rmSync(foreignDir, { recursive: true, force: true }));
       const foreignPort = await spawnServer(foreignDir, 'neighbour.mjs', 'Neighbour App');
 

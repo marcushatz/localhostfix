@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import pc from 'picocolors';
 import type { Command } from 'commander';
-import { AgentViewConfigSchema } from '../config/schema.js';
-import { configPath, loadConfig, saveConfig } from '../config/config.js';
+import { LocalhostFixConfigSchema } from '../config/schema.js';
+import { configPath, legacyDirNotice, loadConfig, saveConfig } from '../config/config.js';
 import { findProjectRoot, detectPackageManager, runScriptCommand } from '../project/discover.js';
 import { detectDevScript, detectFramework } from '../frameworks/adapter.js';
 import { checkBrowserInstalled } from '../browser/driver.js';
@@ -12,7 +12,7 @@ import { installClaudeIntegration } from '../integrations/claude-install.js';
 export function registerSetupCommand(program: Command): void {
   program
     .command('setup')
-    .description('One-time project configuration (detects framework, dev command, port; writes .agentview/config.json)')
+    .description('One-time project configuration (detects framework, dev command, port; writes .localhostfix/config.json)')
     .option('--claude', 'also install the Claude Code project skill')
     .option('--auto <mode>', 'automatic verification mode: off | advisory | enforced')
     .option('--shared', 'install hooks into the committed .claude/settings.json instead of settings.local.json')
@@ -21,11 +21,14 @@ export function registerSetupCommand(program: Command): void {
       const changes: string[] = [];
       const project = findProjectRoot(process.cwd());
       console.log('');
-      console.log(pc.bold('  AgentView setup'));
+      console.log(pc.bold('  LocalhostFix setup'));
       console.log(`  Project root: ${project.root}`);
 
+      const legacy = legacyDirNotice(project.root);
+      if (legacy) console.log(pc.yellow(`  ! ${legacy}`));
+
       if (!project.packageJson) {
-        console.log(pc.yellow('  ! No package.json found. AgentView can still work with an explicit "url" or "devCommand" in .agentview/config.json.'));
+        console.log(pc.yellow('  ! No package.json found. LocalhostFix can still work with an explicit "url" or "devCommand" in .localhostfix/config.json.'));
       }
 
       const adapter = detectFramework(project.packageJson, project.root);
@@ -43,7 +46,7 @@ export function registerSetupCommand(program: Command): void {
         ...(script ? { devCommand: runScriptCommand(pm, script.script) } : {}),
         ...(adapter.defaultPort ? { expectedPort: adapter.defaultPort } : {}),
       };
-      const base = existing.source && !existing.error ? existing.config : AgentViewConfigSchema.parse({});
+      const base = existing.source && !existing.error ? existing.config : LocalhostFixConfigSchema.parse({});
       const merged = opts.force ? { ...base, ...detected } : { ...detected, ...stripUndefined(base), ...(existing.source ? {} : detected) };
       const auto = opts.auto;
       if (auto) {
@@ -58,7 +61,7 @@ export function registerSetupCommand(program: Command): void {
         merged.claudeIntegration = mode && mode !== 'off' ? mode : 'advisory';
       }
 
-      const parsed = AgentViewConfigSchema.parse(merged);
+      const parsed = LocalhostFixConfigSchema.parse(merged);
       const file = saveConfig(project.root, parsed);
       changes.push(`${existing.source ? 'Updated' : 'Created'} ${path.relative(project.root, file)}`);
 
@@ -75,7 +78,7 @@ export function registerSetupCommand(program: Command): void {
         console.log(pc.green(`  ✓ Chromium ready (${build})`));
       } else {
         console.log(pc.yellow('  ! Chromium is not installed for Playwright.'));
-        console.log(pc.yellow('    AgentView will not download browsers without your approval. Run:'));
+        console.log(pc.yellow('    LocalhostFix will not download browsers without your approval. Run:'));
         console.log(pc.bold('      npx playwright install chromium'));
       }
 
@@ -91,25 +94,25 @@ export function registerSetupCommand(program: Command): void {
       for (const c of changes) console.log(`  - ${c}`);
 
       // Say plainly whether the project is ready, and what to do if not.
-      // Reporting "setup complete" for a project AgentView cannot inspect
+      // Reporting "setup complete" for a project LocalhostFix cannot inspect
       // would only move the failure to the next command.
       console.log('');
       console.log(pc.bold('  Next steps'));
       const canRun = Boolean(parsed.devCommand || parsed.url);
       if (!canRun) {
-        console.log(pc.yellow('  ! AgentView cannot inspect this project yet: no dev command was found.'));
+        console.log(pc.yellow('  ! LocalhostFix cannot inspect this project yet: no dev command was found.'));
         console.log('    Add a "dev" script to package.json, or set "devCommand" or "url"');
-        console.log(`    in ${path.relative(process.cwd(), file) || '.agentview/config.json'}.`);
+        console.log(`    in ${path.relative(process.cwd(), file) || '.localhostfix/config.json'}.`);
       } else if (!availability.installed) {
         console.log('  1. npx playwright install chromium');
-        console.log('  2. agentview doctor');
+        console.log('  2. localhostfix doctor');
       } else {
-        console.log('  1. agentview doctor      check the whole chain');
-        console.log('  2. agentview inspect     inspect the rendered app');
+        console.log('  1. localhostfix doctor      check the whole chain');
+        console.log('  2. localhostfix inspect     inspect the rendered app');
       }
       if (!opts.claude) {
         console.log('');
-        console.log(pc.dim('  `agentview setup --claude` installs the Claude Code skill and verification hook.'));
+        console.log(pc.dim('  `localhostfix setup --claude` installs the Claude Code skill and verification hook.'));
       }
       console.log('');
     });
@@ -117,13 +120,13 @@ export function registerSetupCommand(program: Command): void {
 
 function ensureGitignore(projectRoot: string): string[] {
   const file = path.join(projectRoot, '.gitignore');
-  const entries = ['.agentview/runs/', '.agentview/latest/', '.agentview/state/'];
+  const entries = ['.localhostfix/runs/', '.localhostfix/latest/', '.localhostfix/state/'];
   const changes: string[] = [];
   let content = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
   const missing = entries.filter((e) => !content.split('\n').some((line) => line.trim() === e || line.trim() === e.replace(/\/$/, '')));
   if (missing.length > 0) {
     if (content.length > 0 && !content.endsWith('\n')) content += '\n';
-    content += '\n# AgentView generated artifacts (may contain screenshots of local data)\n' + missing.join('\n') + '\n';
+    content += '\n# LocalhostFix generated artifacts (may contain screenshots of local data)\n' + missing.join('\n') + '\n';
     fs.writeFileSync(file, content);
     changes.push(`Added ${missing.join(', ')} to .gitignore`);
   }

@@ -1,4 +1,4 @@
-# AgentView — Implementation Plan (v0.1)
+# LocalhostFix — Implementation Plan (v0.1)
 
 Phases are executed in order, each ending in a commit with a working tree that builds and passes tests.
 
@@ -12,7 +12,7 @@ Phases are executed in order, each ending in a commit with a working tree that b
 
 ## Phase 1 — Deterministic inspection core ✅
 
-Project discovery → framework adapters → dev-server lifecycle with URL/port discovery → port-ownership verification → Chromium launch → navigation → evidence collection → artifact writing → report generation. `agentview inspect` end to end.
+Project discovery → framework adapters → dev-server lifecycle with URL/port discovery → port-ownership verification → Chromium launch → navigation → evidence collection → artifact writing → report generation. `localhostfix inspect` end to end.
 
 ## Phase 2 — Doctor and diagnosis engine ✅
 
@@ -20,7 +20,7 @@ Layered health checks with ok/warn/fail/unknown/action levels, the full verdict 
 
 ## Phase 3 — Setup and agent integration ✅
 
-`agentview setup` (detection, config merge, .gitignore, browser readiness), Claude project Skill, optional hook-based automatic verification with three loop-prevention mechanisms, settings preservation with backup, `agentview watch`, plus `status` and `clean`.
+`localhostfix setup` (detection, config merge, .gitignore, browser readiness), Claude project Skill, optional hook-based automatic verification with three loop-prevention mechanisms, settings preservation with backup, `localhostfix watch`, plus `status` and `clean`.
 
 ## Phase 4 — Testing and fixtures
 
@@ -60,7 +60,7 @@ Run against a real local frontend, record `DOGFOOD_REPORT.md` with real artifact
 
 | # | Criterion | Where |
 |---|---|---|
-| 1 | One-command setup | `agentview setup` |
+| 1 | One-command setup | `localhostfix setup` |
 | 2 | Doctor detects framework, pm, dev command, URL, server, browser | `commands/doctor.ts` |
 | 3 | Starts or reuses the dev server | `server/lifecycle.ts` |
 | 4 | Detects actual URL when it differs from expected port | `extractUrlFromLog` + portMismatch |

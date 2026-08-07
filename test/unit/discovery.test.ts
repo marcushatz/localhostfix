@@ -13,7 +13,7 @@ import { isFrontendFile } from '../../src/commands/watch.js';
 
 const dirs: string[] = [];
 function tmpProject(files: Record<string, string>): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentview-disc-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'localhostfix-disc-'));
   dirs.push(dir);
   for (const [name, content] of Object.entries(files)) {
     const full = path.join(dir, name);
@@ -121,6 +121,6 @@ describe('frontend file classification', () => {
     expect(isFrontendFile('server/db.sql')).toBe(false);
     expect(isFrontendFile(path.join('node_modules', 'react', 'index.js'))).toBe(false);
     expect(isFrontendFile(path.join('.next', 'static', 'chunk.js'))).toBe(false);
-    expect(isFrontendFile(path.join('.agentview', 'runs', 'x.js'))).toBe(false);
+    expect(isFrontendFile(path.join('.localhostfix', 'runs', 'x.js'))).toBe(false);
   });
 });

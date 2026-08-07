@@ -86,7 +86,7 @@ export function printSummary(r: InspectionReport, runDir: string): void {
   const reportPath = path.relative(process.cwd(), path.join(runDir, 'report.md'));
   console.log(pc.dim(`  Report:      ${reportPath}`));
   if (r.artifacts.desktopScreenshot) {
-    console.log(pc.dim(`  Screenshots: ${path.join('.agentview', 'latest')}/{desktop,mobile}.png`));
+    console.log(pc.dim(`  Screenshots: ${path.join('.localhostfix', 'latest')}/{desktop,mobile}.png`));
   }
   console.log('');
 }

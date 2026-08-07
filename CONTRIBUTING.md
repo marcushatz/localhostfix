@@ -1,6 +1,6 @@
-# Contributing to AgentView
+# Contributing to LocalhostFix
 
-Thanks for considering a contribution. AgentView is a small, deliberately focused tool; the bar for changes is honesty and evidence rather than volume.
+Thanks for considering a contribution. LocalhostFix is a small, deliberately focused tool; the bar for changes is honesty and evidence rather than volume.
 
 ## Principles
 
@@ -12,7 +12,7 @@ Thanks for considering a contribution. AgentView is a small, deliberately focuse
 ## Setup
 
 ```bash
-git clone <repo> && cd agentview
+git clone <repo> && cd localhostfix
 npm install
 npm run build
 npm test

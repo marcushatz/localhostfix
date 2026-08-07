@@ -8,12 +8,12 @@ import { describeSelection, discoverServers, type DiscoveryResult } from './disc
 import type { FrameworkAdapter } from '../frameworks/adapter.js';
 
 export interface ServerHandle {
-  /** Null when AgentView reused an already-running server. */
+  /** Null when LocalhostFix reused an already-running server. */
   child: ChildProcess | null;
   startedByUs: boolean;
   url: string;
   /**
-   * Whether the process serving `url` belongs to the tree AgentView started.
+   * Whether the process serving `url` belongs to the tree LocalhostFix started.
    * 'reused' means we intentionally connected to a pre-existing server.
    * 'unknown' means ownership could not be determined (no lsof/permissions).
    */
@@ -24,7 +24,7 @@ export interface ServerHandle {
   selectionReason: string;
   /** Combined stdout+stderr captured so far (started servers only). */
   getLog(): string;
-  /** Stop the server iff AgentView started it. Safe to call twice. */
+  /** Stop the server iff LocalhostFix started it. Safe to call twice. */
   stop(): Promise<void>;
 }
 
@@ -182,7 +182,7 @@ export async function ensureServer(opts: StartOptions): Promise<StartResult> {
   });
   child.on('error', (err) => {
     exited = true;
-    append(`\n[agentview] spawn error: ${err.message}\n`);
+    append(`\n[localhostfix] spawn error: ${err.message}\n`);
   });
 
   const stop = async () => {
@@ -235,8 +235,8 @@ export async function ensureServer(opts: StartOptions): Promise<StartResult> {
           skippedForeign,
           selectionReason:
             ownership.status === 'ours'
-              ? 'started by AgentView; verified by process ancestry'
-              : 'started by AgentView; ownership not verifiable on this system',
+              ? 'started by LocalhostFix; verified by process ancestry'
+              : 'started by LocalhostFix; ownership not verifiable on this system',
           getLog: () => log,
           stop,
         },
@@ -264,7 +264,7 @@ export function rankProjectServers<T extends { commandLine: string | null }>(
 }
 
 /**
- * Ports probed AFTER AgentView spawns the dev server. Discovery handles the
+ * Ports probed AFTER LocalhostFix spawns the dev server. Discovery handles the
  * reuse case; here we only need places our own new server might appear
  * before it prints its URL.
  */
@@ -282,7 +282,7 @@ export function writeServerLog(runDir: string, handle: ServerHandle): string | n
   const log = handle.getLog();
   const file = path.join(runDir, 'server.log');
   if (!handle.startedByUs && log.length === 0) {
-    fs.writeFileSync(file, '[agentview] reused an already-running dev server; its logs are not captured.\n');
+    fs.writeFileSync(file, '[localhostfix] reused an already-running dev server; its logs are not captured.\n');
     return file;
   }
   fs.writeFileSync(file, log);

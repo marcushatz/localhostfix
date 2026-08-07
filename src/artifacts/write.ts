@@ -1,12 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { agentviewDir } from '../config/config.js';
+import { localhostfixDir } from '../config/config.js';
 import type { RouteEvidence } from '../inspect/collect.js';
 import { renderMarkdownReport, type InspectionReport } from './report.js';
 
 export function createRunDir(projectRoot: string, now = new Date()): string {
   const stamp = now.toISOString().replace(/:/g, '-').replace(/\..+$/, '');
-  const dir = path.join(agentviewDir(projectRoot), 'runs', stamp);
+  const dir = path.join(localhostfixDir(projectRoot), 'runs', stamp);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -56,11 +56,11 @@ export function writeReport(runDir: string, report: InspectionReport): void {
 }
 
 /**
- * Refresh `.agentview/latest` as a copy of the newest run so agents can
+ * Refresh `.localhostfix/latest` as a copy of the newest run so agents can
  * always read a stable path.
  */
 export function updateLatest(projectRoot: string, runDir: string): string {
-  const latest = path.join(agentviewDir(projectRoot), 'latest');
+  const latest = path.join(localhostfixDir(projectRoot), 'latest');
   fs.rmSync(latest, { recursive: true, force: true });
   fs.mkdirSync(latest, { recursive: true });
   for (const entry of fs.readdirSync(runDir)) {

@@ -1,4 +1,4 @@
-# AgentView Frontend Inspection
+# LocalhostFix Frontend Inspection
 
 Result: **ROUTE_NOT_FOUND** (confidence: high)
 
@@ -39,4 +39,4 @@ likelyBlank: uncertain (confidence: low)
 
 The route /this-route-does-not-exist does not exist on this server. Check the route path or inspect a different route.
 
-> Domain: this is an application problem — AgentView's tooling chain worked.
+> Domain: this is an application problem — LocalhostFix's tooling chain worked.

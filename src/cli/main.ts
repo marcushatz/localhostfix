@@ -13,7 +13,7 @@ import { toolVersion } from '../inspect/run.js';
 const program = new Command();
 
 program
-  .name('agentview')
+  .name('localhostfix')
   .description(
     'Verifies that your coding agent can inspect the frontend it is changing: finds or starts the dev server, renders the app in Chromium, captures evidence, and explains which layer failed.',
   )
@@ -29,6 +29,6 @@ registerCleanCommand(program);
 registerHookCommand(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
-  console.error('agentview: unexpected error:', err instanceof Error ? err.message : err);
+  console.error('localhostfix: unexpected error:', err instanceof Error ? err.message : err);
   process.exit(4);
 });

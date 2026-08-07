@@ -3,7 +3,7 @@ import path from 'node:path';
 import { chromium, type Browser } from 'playwright-core';
 
 /**
- * AgentView launches with `channel: 'chromium'` — Playwright's "new headless"
+ * LocalhostFix launches with `channel: 'chromium'` — Playwright's "new headless"
  * mode, which is the real Chromium binary rather than the reduced headless
  * shell. Rendering fidelity is the entire point of this tool, so the faithful
  * binary is the right default even though it is slightly slower to start.

@@ -12,7 +12,7 @@ const FRONTEND_EXTENSIONS = new Set([
   '.html', '.vue', '.svelte', '.astro', '.mdx',
 ]);
 
-const IGNORED_SEGMENTS = new Set(['node_modules', '.git', '.agentview', 'dist', 'build', '.next', 'coverage', 'out']);
+const IGNORED_SEGMENTS = new Set(['node_modules', '.git', '.localhostfix', 'dist', 'build', '.next', 'coverage', 'out']);
 
 export function isFrontendFile(filePath: string): boolean {
   const parts = filePath.split(path.sep);
@@ -79,7 +79,7 @@ export function registerWatchCommand(program: Command): void {
       schedule();
 
       // Interrupting mid-inspection could otherwise orphan a dev server that
-      // AgentView started, so wait for the in-flight run to finish cleaning
+      // LocalhostFix started, so wait for the in-flight run to finish cleaning
       // up before exiting. A second interrupt exits immediately.
       await new Promise<void>((resolve) => {
         let stopping = false;

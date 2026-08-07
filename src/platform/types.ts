@@ -1,7 +1,7 @@
 /**
- * Everything AgentView needs from the operating system, behind one interface.
+ * Everything LocalhostFix needs from the operating system, behind one interface.
  *
- * Server identity — the feature that stops AgentView inspecting the wrong
+ * Server identity — the feature that stops LocalhostFix inspecting the wrong
  * application — depends entirely on OS process inspection, and that is the
  * least portable part of the tool. Isolating it here means adding a platform
  * is implementing this interface, not hunting through the codebase.
@@ -28,7 +28,7 @@ export interface ProcessInspector {
   readonly name: string;
 
   /**
-   * Whether process inspection is usable here at all. When false, AgentView
+   * Whether process inspection is usable here at all. When false, LocalhostFix
    * reports port ownership as unknown and says so, rather than guessing.
    */
   readonly supported: boolean;
@@ -43,8 +43,8 @@ export interface ProcessInspector {
   parentPid(pid: number): number | null;
 
   /**
-   * Terminate a process tree that AgentView started. Implementations must
-   * only ever be called with a PID AgentView spawned itself.
+   * Terminate a process tree that LocalhostFix started. Implementations must
+   * only ever be called with a PID LocalhostFix spawned itself.
    */
   killTree(pid: number, signal: 'SIGTERM' | 'SIGKILL'): void;
 }

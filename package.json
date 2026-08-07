@@ -1,12 +1,9 @@
 {
-  "name": "@agentview/cli",
+  "name": "localhostfix",
   "version": "0.1.0",
-  "description": "AgentView verifies that your coding agent can inspect the frontend it is changing. It starts or finds the local dev server, opens the rendered app in Chromium, captures browser evidence, and explains which layer failed when inspection does not work.",
+  "description": "Open-source CLI for when Claude Code or another coding agent cannot properly see your localhost frontend through Playwright. Fixes common setup failures, diagnoses application failures with evidence, and verifies that the real frontend renders again.",
   "type": "module",
   "license": "MIT",
-  "bin": {
-    "agentview": "./dist/cli/main.js"
-  },
   "main": "./dist/index.js",
   "files": [
     "dist",
@@ -32,14 +29,15 @@
     "playwright",
     "claude-code",
     "coding-agents",
+    "localhost",
     "frontend",
     "screenshot",
-    "verification",
-    "localhost"
+    "debugging",
+    "dev-server"
   ],
   "repository": {
     "type": "git",
-    "url": "https://example.invalid/placeholder-until-github-repo-created"
+    "url": "https://github.com/OWNER/localhostfix.git"
   },
   "private": true,
   "dependencies": {
@@ -52,5 +50,8 @@
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
+  },
+  "bin": {
+    "localhostfix": "./dist/cli/main.js"
   }
 }

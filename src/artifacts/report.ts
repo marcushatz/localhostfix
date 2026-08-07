@@ -8,34 +8,34 @@ import type { Confidence, Evidence, InspectionLayer, Verdict } from '../diagnose
  */
 export interface InspectionReport {
   schemaVersion: 1;
-  tool: { name: 'agentview'; version: string };
+  tool: { name: 'localhostfix'; version: string };
   startedAt: string;
   durationMs: number;
   verdict: Verdict;
   confidence: Confidence;
   layer: InspectionLayer;
-  /** Whose problem this is: AgentView/environment vs the application. */
+  /** Whose problem this is: LocalhostFix/environment vs the application. */
   domain: 'setup' | 'application' | 'healthy' | 'unknown';
   exitCode: number;
   route: string;
   url: string | null;
   server: {
     reachable: boolean;
-    startedByAgentView: boolean;
+    startedByLocalhostFix: boolean;
     reusedExisting: boolean;
     command: string | null;
     expectedPort: number | null;
     actualUrl: string | null;
     portMismatch: boolean;
     /**
-     * Whether the process serving the URL belongs to the tree AgentView
+     * Whether the process serving the URL belongs to the tree LocalhostFix
      * started ('ours'), was an intentionally reused pre-existing server
      * ('reused'), or could not be determined ('unknown').
      */
     ownership: 'ours' | 'reused' | 'unknown';
     /**
      * Reachable servers deliberately NOT used because they belong to a
-     * different project. Surfaced so the developer learns why AgentView
+     * different project. Surfaced so the developer learns why LocalhostFix
      * started its own server on a different port.
      */
     skippedForeign: { url: string; cwd: string; owners: string[] }[];
@@ -81,13 +81,13 @@ export interface InspectionReport {
 }
 
 const VERDICT_HEADLINES: Record<Verdict, string> = {
-  PROJECT_NOT_RECOGNIZED: 'AgentView could not recognize this project',
+  PROJECT_NOT_RECOGNIZED: 'LocalhostFix could not recognize this project',
   DEV_COMMAND_NOT_FOUND: 'No development command found',
   SERVER_START_FAILED: 'The development server failed to start',
   SERVER_START_TIMEOUT: 'The development server did not become ready in time',
   SERVER_UNREACHABLE: 'The development server is not reachable',
-  SERVER_PORT_CONFLICT: 'The advertised port is served by a process AgentView did not start',
-  MULTIPLE_PROJECT_SERVERS: 'Several servers are running in this project and AgentView will not guess',
+  SERVER_PORT_CONFLICT: 'The advertised port is served by a process LocalhostFix did not start',
+  MULTIPLE_PROJECT_SERVERS: 'Several servers are running in this project and LocalhostFix will not guess',
   PORT_MISMATCH: 'The server is running on a different port than configured',
   BROWSER_NOT_INSTALLED: 'Chromium is not installed for Playwright',
   BROWSER_LAUNCH_FAILED: 'Chromium failed to launch',
@@ -99,12 +99,12 @@ const VERDICT_HEADLINES: Record<Verdict, string> = {
   LIKELY_BLANK_RENDER: 'The page very likely rendered blank',
   PARTIAL_RENDER: 'The page rendered with problems',
   HEALTHY_RENDER: 'The page rendered successfully',
-  INDETERMINATE: 'AgentView could not determine the page state',
+  INDETERMINATE: 'LocalhostFix could not determine the page state',
 };
 
 export function renderMarkdownReport(r: InspectionReport): string {
   const lines: string[] = [];
-  lines.push('# AgentView Frontend Inspection');
+  lines.push('# LocalhostFix Frontend Inspection');
   lines.push('');
   lines.push(`Result: **${r.verdict}** (confidence: ${r.confidence})`);
   lines.push('');
@@ -172,7 +172,7 @@ export function renderMarkdownReport(r: InspectionReport): string {
       r.domain === 'setup'
         ? 'an environment/setup problem — fixing application code will not resolve it'
         : r.domain === 'application'
-          ? "an application problem — AgentView's tooling chain worked"
+          ? "an application problem — LocalhostFix's tooling chain worked"
           : r.domain === 'healthy'
             ? 'a healthy inspection — verify the screenshots before claiming visual correctness'
             : 'unclassified — treat conclusions as uncertain'
@@ -186,7 +186,7 @@ function serverLine(r: InspectionReport): string {
   if (!r.server.reachable) return 'not reachable';
   const how = r.server.reusedExisting
     ? 'reused already-running server'
-    : `started by AgentView${r.server.ownership === 'ours' ? ', port ownership verified' : ''}`;
+    : `started by LocalhostFix${r.server.ownership === 'ours' ? ', port ownership verified' : ''}`;
   const mismatch = r.server.portMismatch
     ? ` — note: actual URL ${r.server.actualUrl} differs from configured port ${r.server.expectedPort}`
     : '';

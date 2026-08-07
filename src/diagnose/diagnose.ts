@@ -165,11 +165,11 @@ function detectAuthGate(
 function recommend(verdict: Verdict, ev: RouteEvidence, evidence: Evidence[]): string {
   switch (verdict) {
     case 'NAVIGATION_FAILED':
-      return 'The browser could not load the page at all. Verify the URL and that the dev server is serving this route, then re-run `agentview doctor`.';
+      return 'The browser could not load the page at all. Verify the URL and that the dev server is serving this route, then re-run `localhostfix doctor`.';
     case 'ROUTE_NOT_FOUND':
       return `The route ${new URL(ev.url).pathname} does not exist on this server. Check the route path or inspect a different route.`;
     case 'AUTHENTICATION_GATE':
-      return 'The route is behind authentication. Inspect a public route, or sign in manually in a headed session — AgentView will not bypass auth.';
+      return 'The route is behind authentication. Inspect a public route, or sign in manually in a headed session — LocalhostFix will not bypass auth.';
     case 'APPLICATION_RUNTIME_FAILURE': {
       const first = evidence.find((e) => e.kind === 'page-error' || e.kind === 'framework-error-overlay');
       return `Fix the application error first${first ? ` (${first.detail.slice(0, 120)})` : ''} before changing visual styling. This is an app bug, not a tooling problem.`;
@@ -183,7 +183,7 @@ function recommend(verdict: Verdict, ev: RouteEvidence, evidence: Evidence[]): s
     case 'HEALTHY_RENDER':
       return 'Rendering succeeded. Inspect desktop.png and mobile.png to verify the visual result — a rendered page is not automatically a correct page.';
     case 'INDETERMINATE':
-      return 'AgentView could not gather enough evidence to classify this page. Re-run with --headed to observe the browser directly.';
+      return 'LocalhostFix could not gather enough evidence to classify this page. Re-run with --headed to observe the browser directly.';
     default:
       return 'See evidence and artifacts.';
   }

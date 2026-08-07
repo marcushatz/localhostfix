@@ -6,13 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, test } from 'vitest';
 import { installClaudeIntegration } from '../../src/integrations/claude-install.js';
 import { claudeIntegrationStatus } from '../../src/integrations/claude.js';
-import { AgentViewConfigSchema } from '../../src/config/schema.js';
+import { LocalhostFixConfigSchema } from '../../src/config/schema.js';
 
 const CLI = path.join(fileURLToPath(new URL('../../', import.meta.url)), 'dist', 'cli', 'main.js');
 
 const dirs: string[] = [];
 function tmpProject(files: Record<string, string> = {}): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentview-claude-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'localhostfix-claude-'));
   dirs.push(dir);
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'p', scripts: { dev: 'node s.mjs' } }));
   for (const [name, content] of Object.entries(files)) {
@@ -27,16 +27,16 @@ afterEach(() => {
 });
 
 const config = (mode: 'off' | 'advisory' | 'enforced') =>
-  AgentViewConfigSchema.parse({ autoInspect: mode, claudeIntegration: mode });
+  LocalhostFixConfigSchema.parse({ autoInspect: mode, claudeIntegration: mode });
 
 describe('Claude integration install', () => {
   test('installs the skill with valid frontmatter', () => {
     const dir = tmpProject();
     installClaudeIntegration(dir, config('advisory'));
 
-    const skill = fs.readFileSync(path.join(dir, '.claude', 'skills', 'agentview', 'SKILL.md'), 'utf8');
+    const skill = fs.readFileSync(path.join(dir, '.claude', 'skills', 'localhostfix', 'SKILL.md'), 'utf8');
     expect(skill.startsWith('---\n')).toBe(true);
-    expect(skill).toMatch(/^name: agentview$/m);
+    expect(skill).toMatch(/^name: localhostfix$/m);
     expect(skill).toMatch(/^description: .+/m);
     // The workflow must tell the agent to look at both screenshots.
     expect(skill).toMatch(/desktop\.png/);
@@ -87,9 +87,9 @@ describe('Claude integration install', () => {
     );
     expect(prettierStillThere).toBe(true);
     // And ours was added.
-    expect(JSON.stringify(after.hooks)).toContain('agentview-hook');
+    expect(JSON.stringify(after.hooks)).toContain('localhostfix-hook');
     // A backup of the original was taken.
-    expect(fs.existsSync(path.join(dir, '.claude', 'settings.local.json.agentview-backup'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, '.claude', 'settings.local.json.localhostfix-backup'))).toBe(true);
   });
 
   test('re-running does not duplicate hook entries', () => {
@@ -99,7 +99,7 @@ describe('Claude integration install', () => {
     installClaudeIntegration(dir, config('enforced'));
 
     const after = JSON.parse(fs.readFileSync(path.join(dir, '.claude', 'settings.local.json'), 'utf8'));
-    const count = JSON.stringify(after).split('agentview-hook').length - 1;
+    const count = JSON.stringify(after).split('localhostfix-hook').length - 1;
     expect(count).toBe(2); // exactly one PostToolUse + one Stop
   });
 
@@ -133,7 +133,7 @@ describe('hook runtime', () => {
     });
   }
 
-  const staleMarker = (dir: string) => path.join(dir, '.agentview', 'state', 'stale');
+  const staleMarker = (dir: string) => path.join(dir, '.localhostfix', 'state', 'stale');
 
   test('a backend-only edit does not mark verification stale', () => {
     const dir = tmpProject();
@@ -156,15 +156,15 @@ describe('hook runtime', () => {
   });
 
   test('the stop hook does nothing when nothing frontend-relevant changed', () => {
-    const dir = tmpProject({ '.agentview/config.json': JSON.stringify({ autoInspect: 'advisory' }) });
+    const dir = tmpProject({ '.localhostfix/config.json': JSON.stringify({ autoInspect: 'advisory' }) });
     const out = runHook(dir, ['stop'], { hook_event_name: 'Stop', stop_hook_active: false });
     expect(out.trim()).toBe(''); // no inspection, no output
   });
 
   test('the stop hook does nothing when autoInspect is off, even if stale', () => {
     const dir = tmpProject({
-      '.agentview/config.json': JSON.stringify({ autoInspect: 'off' }),
-      '.agentview/state/stale': 'now src/Hero.tsx',
+      '.localhostfix/config.json': JSON.stringify({ autoInspect: 'off' }),
+      '.localhostfix/state/stale': 'now src/Hero.tsx',
     });
     const out = runHook(dir, ['stop'], { hook_event_name: 'Stop', stop_hook_active: false });
     expect(out.trim()).toBe('');
@@ -174,9 +174,9 @@ describe('hook runtime', () => {
 
   test('a held lock prevents a concurrent inspection', () => {
     const dir = tmpProject({
-      '.agentview/config.json': JSON.stringify({ autoInspect: 'advisory' }),
-      '.agentview/state/stale': 'now src/Hero.tsx',
-      '.agentview/state/inspect.lock': '999999',
+      '.localhostfix/config.json': JSON.stringify({ autoInspect: 'advisory' }),
+      '.localhostfix/state/stale': 'now src/Hero.tsx',
+      '.localhostfix/state/inspect.lock': '999999',
     });
     const out = runHook(dir, ['stop'], { hook_event_name: 'Stop', stop_hook_active: false });
     expect(out.trim()).toBe('');
@@ -184,12 +184,12 @@ describe('hook runtime', () => {
 
   test('enforced mode never blocks twice: stop_hook_active suppresses blocking', () => {
     // A project with no dev script fails fast, so no browser is launched.
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentview-claude-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'localhostfix-claude-'));
     dirs.push(dir);
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'p', scripts: {} }));
-    fs.mkdirSync(path.join(dir, '.agentview', 'state'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '.localhostfix', 'state'), { recursive: true });
     fs.writeFileSync(
-      path.join(dir, '.agentview', 'config.json'),
+      path.join(dir, '.localhostfix', 'config.json'),
       JSON.stringify({ autoInspect: 'enforced' }),
     );
     fs.writeFileSync(staleMarker(dir), 'now src/Hero.tsx');
@@ -207,22 +207,22 @@ describe('hook runtime', () => {
       runHook(dir, ['stop'], { hook_event_name: 'Stop', stop_hook_active: true }),
     );
     expect(second.decision).toBeUndefined();
-    expect(second.systemMessage).toMatch(/AgentView inspected/);
+    expect(second.systemMessage).toMatch(/LocalhostFix inspected/);
   });
 
   test('the stale marker is cleared by a run so one edit causes one inspection', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentview-claude-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'localhostfix-claude-'));
     dirs.push(dir);
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'p', scripts: {} }));
-    fs.mkdirSync(path.join(dir, '.agentview', 'state'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '.localhostfix', 'state'), { recursive: true });
     fs.writeFileSync(
-      path.join(dir, '.agentview', 'config.json'),
+      path.join(dir, '.localhostfix', 'config.json'),
       JSON.stringify({ autoInspect: 'advisory' }),
     );
     fs.writeFileSync(staleMarker(dir), 'now src/Hero.tsx');
 
     const first = runHook(dir, ['stop'], { hook_event_name: 'Stop', stop_hook_active: false });
-    expect(first).toMatch(/AgentView inspected/);
+    expect(first).toMatch(/LocalhostFix inspected/);
     expect(fs.existsSync(staleMarker(dir))).toBe(false);
 
     // Nothing changed since, so the next Stop is a no-op.

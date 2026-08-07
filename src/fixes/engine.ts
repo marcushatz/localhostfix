@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { agentviewDir, configPath, loadConfig, saveConfig } from '../config/config.js';
-import { AgentViewConfigSchema } from '../config/schema.js';
+import { localhostfixDir, configPath, loadConfig, saveConfig } from '../config/config.js';
+import { LocalhostFixConfigSchema } from '../config/schema.js';
 import { detectFramework, detectDevScript, adapterById } from '../frameworks/adapter.js';
 import { findProjectRoot, detectPackageManager, runScriptCommand } from '../project/discover.js';
 import { checkBrowserInstalled, INSTALL_COMMAND } from '../browser/driver.js';
@@ -10,17 +10,17 @@ import type { InspectionReport } from '../artifacts/report.js';
 import { verdictDomain, type Verdict } from '../diagnose/verdict.js';
 
 /**
- * `agentview fix` — attempt safe recovery, then VERIFY.
+ * `localhostfix fix` — attempt safe recovery, then VERIFY.
  *
  * This is orchestration only. Diagnosis comes from exactly the same code path
  * `inspect` and `doctor` use; nothing here re-implements discovery or
  * classification. The command's whole job is: diagnose → apply only fixes
- * AgentView can make confidently → re-inspect → report honestly whether
+ * LocalhostFix can make confidently → re-inspect → report honestly whether
  * rendered frontend access was actually restored.
  *
  * Two rules constrain everything below:
  *
- *  1. AgentView repairs its OWN state and configuration. It never edits
+ *  1. LocalhostFix repairs its OWN state and configuration. It never edits
  *     application source, never signals a process it did not start, and never
  *     weakens a security or privacy control to make a run succeed.
  *  2. `FIXED` is only ever reported when a fresh verification inspection
@@ -34,14 +34,14 @@ export type FixOutcome =
   | 'FIXED'
   /** Infrastructure is healthy; the application itself is broken. */
   | 'APPLICATION_FIX_REQUIRED'
-  /** AgentView cannot safely repair this, or a fix did not restore access. */
+  /** LocalhostFix cannot safely repair this, or a fix did not restore access. */
   | 'COULD_NOT_REPAIR';
 
 export interface AppliedFix {
   id: string;
   /** What was wrong. */
   problem: string;
-  /** What AgentView changed. */
+  /** What LocalhostFix changed. */
   change: string;
   succeeded: boolean;
   /** How to undo it. */
@@ -62,7 +62,7 @@ export interface FixResult {
   finalReport: InspectionReport;
   /** Set when the run was verified after a fix rather than diagnosed once. */
   verified: boolean;
-  /** Why AgentView stopped, when it could not repair. */
+  /** Why LocalhostFix stopped, when it could not repair. */
   blockedBy: string | null;
   /** A fix that is safe but needs the user to say yes. */
   requiresApproval: ApprovalRequired | null;
@@ -87,7 +87,7 @@ export async function runFix(opts: FixOptions): Promise<FixResult> {
   const project = findProjectRoot(opts.cwd);
   const fixesApplied: AppliedFix[] = [];
 
-  // Repairs to AgentView's own files happen before diagnosis, because a
+  // Repairs to LocalhostFix's own files happen before diagnosis, because a
   // corrupt config is what prevents diagnosis from being meaningful.
   fixesApplied.push(...repairOwnState(project.root));
 
@@ -117,7 +117,7 @@ export async function runFix(opts: FixOptions): Promise<FixResult> {
     });
   }
 
-  // The application is broken. AgentView's job here is evidence, not repair.
+  // The application is broken. LocalhostFix's job here is evidence, not repair.
   if (verdictDomain(initialVerdict) === 'application') {
     return finalize({
       outcome: 'APPLICATION_FIX_REQUIRED',
@@ -131,7 +131,7 @@ export async function runFix(opts: FixOptions): Promise<FixResult> {
     });
   }
 
-  // Infrastructure problem: decide whether it is one AgentView may repair.
+  // Infrastructure problem: decide whether it is one LocalhostFix may repair.
   const plan = planFix(project.root, first.report, initialVerdict, opts);
 
   if (plan.kind === 'requires-approval') {
@@ -228,7 +228,7 @@ function planFix(
   switch (verdict) {
     case 'BROWSER_NOT_INSTALLED': {
       // Installing software is safe but not silent: it downloads ~150 MB and
-      // is the user's decision, not AgentView's.
+      // is the user's decision, not LocalhostFix's.
       if (!opts.approveInstall) {
         return {
           kind: 'requires-approval',
@@ -243,7 +243,7 @@ function planFix(
     }
 
     case 'SERVER_START_TIMEOUT': {
-      // A slow dev server is a configuration problem AgentView owns.
+      // A slow dev server is a configuration problem LocalhostFix owns.
       const { config } = loadConfig(projectRoot);
       const current = config.startupTimeoutMs;
       // Give the retry a genuinely generous budget rather than a marginal
@@ -253,7 +253,7 @@ function planFix(
       if (raised <= current) {
         return {
           kind: 'unrepairable',
-          reason: `the dev server did not become ready within ${current}ms, already the maximum AgentView will wait`,
+          reason: `the dev server did not become ready within ${current}ms, already the maximum LocalhostFix will wait`,
         };
       }
       saveConfig(projectRoot, { ...config, startupTimeoutMs: raised });
@@ -263,9 +263,9 @@ function planFix(
           {
             id: 'startup-timeout',
             problem: `the dev server did not become ready within ${current}ms`,
-            change: `raised startupTimeoutMs to ${raised} in .agentview/config.json`,
+            change: `raised startupTimeoutMs to ${raised} in .localhostfix/config.json`,
             succeeded: true,
-            undo: `set "startupTimeoutMs": ${current} in .agentview/config.json`,
+            undo: `set "startupTimeoutMs": ${current} in .localhostfix/config.json`,
           },
         ],
       };
@@ -275,28 +275,28 @@ function planFix(
       return {
         kind: 'unrepairable',
         reason:
-          'several servers are running in this project and AgentView will not guess which is your app. Re-run with --url http://localhost:<port>, or stop the ones you are not using.',
+          'several servers are running in this project and LocalhostFix will not guess which is your app. Re-run with --url http://localhost:<port>, or stop the ones you are not using.',
       };
 
     case 'SERVER_PORT_CONFLICT':
       return {
         kind: 'unrepairable',
         reason:
-          'the port is held by a process AgentView did not start. AgentView will not terminate it. Stop it yourself, or set "url"/"expectedPort" in .agentview/config.json.',
+          'the port is held by a process LocalhostFix did not start. LocalhostFix will not terminate it. Stop it yourself, or set "url"/"expectedPort" in .localhostfix/config.json.',
       };
 
     case 'DEV_COMMAND_NOT_FOUND':
       return {
         kind: 'unrepairable',
         reason:
-          'no server is running and there is no dev command to start one. Add a "dev" script to package.json, or set "devCommand" in .agentview/config.json.',
+          'no server is running and there is no dev command to start one. Add a "dev" script to package.json, or set "devCommand" in .localhostfix/config.json.',
       };
 
     case 'SERVER_START_FAILED':
       return {
         kind: 'unrepairable',
         reason:
-          'the dev server exited before becoming reachable. This is a problem in the project, not in AgentView — read server.log in the run directory.',
+          'the dev server exited before becoming reachable. This is a problem in the project, not in LocalhostFix — read server.log in the run directory.',
       };
 
     case 'PROJECT_NOT_RECOGNIZED': {
@@ -306,8 +306,8 @@ function planFix(
       return {
         kind: 'unrepairable',
         reason: blocked
-          ? 'the configured URL is not localhost. AgentView will not contact it, and will not disable that protection for you. Pass --allow-remote deliberately if you understand the privacy implications.'
-          : 'no Node.js project was found here. Run `agentview setup` in your project directory.',
+          ? 'the configured URL is not localhost. LocalhostFix will not contact it, and will not disable that protection for you. Pass --allow-remote deliberately if you understand the privacy implications.'
+          : 'no Node.js project was found here. Run `localhostfix setup` in your project directory.',
       };
     }
 
@@ -320,20 +320,20 @@ function planFix(
     default:
       return {
         kind: 'unrepairable',
-        reason: `AgentView has no safe automatic repair for ${verdict}.`,
+        reason: `LocalhostFix has no safe automatic repair for ${verdict}.`,
       };
   }
 }
 
 /**
- * Repair AgentView's own files. These run before diagnosis because broken
- * AgentView state makes every later answer untrustworthy.
+ * Repair LocalhostFix's own files. These run before diagnosis because broken
+ * LocalhostFix state makes every later answer untrustworthy.
  */
 function repairOwnState(projectRoot: string): AppliedFix[] {
   const fixes: AppliedFix[] = [];
 
   // A stale lock left by a crashed run would suppress the Claude Stop hook.
-  const lock = path.join(agentviewDir(projectRoot), 'state', 'inspect.lock');
+  const lock = path.join(localhostfixDir(projectRoot), 'state', 'inspect.lock');
   if (fs.existsSync(lock)) {
     try {
       const age = Date.now() - fs.statSync(lock).mtimeMs;
@@ -342,7 +342,7 @@ function repairOwnState(projectRoot: string): AppliedFix[] {
         fixes.push({
           id: 'stale-lock',
           problem: `a stale inspection lock from a crashed run (${Math.round(age / 60000)} minutes old) was blocking automatic verification`,
-          change: 'removed .agentview/state/inspect.lock',
+          change: 'removed .localhostfix/state/inspect.lock',
           succeeded: true,
           undo: 'none needed; the lock is recreated per run',
         });
@@ -352,7 +352,7 @@ function repairOwnState(projectRoot: string): AppliedFix[] {
     }
   }
 
-  // An unparseable config makes AgentView fall back to defaults silently.
+  // An unparseable config makes LocalhostFix fall back to defaults silently.
   const { error } = loadConfig(projectRoot);
   if (error) {
     const file = configPath(projectRoot);
@@ -365,7 +365,7 @@ function repairOwnState(projectRoot: string): AppliedFix[] {
       const script = detectDevScript(project.packageJson, adapter);
       saveConfig(
         projectRoot,
-        AgentViewConfigSchema.parse({
+        LocalhostFixConfigSchema.parse({
           framework: adapter.id,
           packageManager: pm,
           ...(script ? { devCommand: runScriptCommand(pm, script.script) } : {}),
@@ -374,15 +374,15 @@ function repairOwnState(projectRoot: string): AppliedFix[] {
       );
       fixes.push({
         id: 'invalid-config',
-        problem: `.agentview/config.json was not valid (${error.split('\n')[0]})`,
+        problem: `.localhostfix/config.json was not valid (${error.split('\n')[0]})`,
         change: `moved it to ${path.basename(backup)} and regenerated it from project detection`,
         succeeded: true,
-        undo: `restore ${path.basename(backup)} over .agentview/config.json`,
+        undo: `restore ${path.basename(backup)} over .localhostfix/config.json`,
       });
     } catch (err) {
       fixes.push({
         id: 'invalid-config',
-        problem: '.agentview/config.json was not valid',
+        problem: '.localhostfix/config.json was not valid',
         change: `could not regenerate it: ${err instanceof Error ? err.message : String(err)}`,
         succeeded: false,
         undo: 'none; nothing changed',
@@ -406,9 +406,9 @@ function correctStoredPort(projectRoot: string, report: InspectionReport): Appli
     {
       id: 'stored-port',
       problem: `configuration expected port ${previous}, but this project's server is on ${actualPort}`,
-      change: `stored expectedPort ${actualPort} in .agentview/config.json`,
+      change: `stored expectedPort ${actualPort} in .localhostfix/config.json`,
       succeeded: true,
-      undo: `set "expectedPort": ${previous ?? 'null'} in .agentview/config.json`,
+      undo: `set "expectedPort": ${previous ?? 'null'} in .localhostfix/config.json`,
     },
   ];
 }

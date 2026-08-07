@@ -2,8 +2,8 @@ node_modules/
 dist/
 *.log
 .DS_Store
-.agentview/runs/
-.agentview/latest/
-.agentview/state/
+.localhostfix/runs/
+.localhostfix/latest/
+.localhostfix/state/
 coverage/
 *.tsbuildinfo

@@ -17,7 +17,7 @@ export interface ProjectInfo {
 
 /**
  * Walk upward from `startDir` to find the nearest directory containing
- * package.json (or .agentview/config.json for pre-configured projects).
+ * package.json (or .localhostfix/config.json for pre-configured projects).
  */
 export function findProjectRoot(startDir: string): ProjectInfo {
   let dir = path.resolve(startDir);
@@ -26,7 +26,7 @@ export function findProjectRoot(startDir: string): ProjectInfo {
     if (fs.existsSync(pkgPath)) {
       return { root: dir, ...readPackageJson(pkgPath) };
     }
-    if (fs.existsSync(path.join(dir, '.agentview', 'config.json'))) {
+    if (fs.existsSync(path.join(dir, '.localhostfix', 'config.json'))) {
       return { root: dir, packageJson: null, packageJsonPath: null };
     }
     const parent = path.dirname(dir);

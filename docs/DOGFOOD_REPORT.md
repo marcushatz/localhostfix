@@ -1,4 +1,4 @@
-# AgentView — Dogfood Report
+# LocalhostFix — Dogfood Report
 
 > Two dogfooding passes are recorded here: the original v0.1 build, and the
 > pre-release hardening pass that followed. Read the
@@ -9,17 +9,17 @@ Date: 2026-08-07 · Platform: macOS (darwin 25.5.0, arm64) · Node 25.2.1 · Pla
 
 Target: **`/Users/example/project-a`** — a real Next.js 16.2.9 marketing site, chosen because it is the application that previously suffered unreliable localhost inspection.
 
-The application source was **not modified** to make AgentView look good. AgentView was run without `agentview setup`, so it never touched the project's `.gitignore` or settings; its only writes were to `.agentview/`, which was removed afterwards. Verified clean at the end: `.agentview` absent, zero AgentView entries in `git status`, `.gitignore` unchanged. (The modified files shown in that repo's `git status` are the developer's own pre-existing work.)
+The application source was **not modified** to make LocalhostFix look good. LocalhostFix was run without `localhostfix setup`, so it never touched the project's `.gitignore` or settings; its only writes were to `.localhostfix/`, which was removed afterwards. Verified clean at the end: `.localhostfix` absent, zero LocalhostFix entries in `git status`, `.gitignore` unchanged. (The modified files shown in that repo's `git status` are the developer's own pre-existing work.)
 
 ## Headline result
 
-Dogfooding found **four real defects** that the fixture tests did not, three of them cases where AgentView confidently reported success while looking at the **wrong application**. Every one is now fixed and covered by a regression test. This is the strongest evidence in the project that the tool does what it claims — and that testing only the happy path would have shipped something dishonest.
+Dogfooding found **four real defects** that the fixture tests did not, three of them cases where LocalhostFix confidently reported success while looking at the **wrong application**. Every one is now fixed and covered by a regression test. This is the strongest evidence in the project that the tool does what it claims — and that testing only the happy path would have shipped something dishonest.
 
 ---
 
 ## Defect 1 — a reachable URL was assumed to be our server
 
-**How it surfaced.** The very first end-to-end run used a throwaway fixture that logged `http://localhost:4599` while actually listening on 4611 (a `sed` had replaced only the first match on the line). AgentView parsed the advertised URL, probed it, got HTTP 200 from an unrelated process already on 4599, and reported:
+**How it surfaced.** The very first end-to-end run used a throwaway fixture that logged `http://localhost:4599` while actually listening on 4611 (a `sed` had replaced only the first match on the line). LocalhostFix parsed the advertised URL, probed it, got HTTP 200 from an unrelated process already on 4599, and reported:
 
 ```
 HEALTHY_RENDER (confidence: high)
@@ -30,16 +30,16 @@ A perfect green result for an application that was never being inspected.
 
 **Why it matters.** This is exactly the product's reason to exist. A dev server advertising a port it does not serve, or a stale process holding a port, silently redirects verification to the wrong app.
 
-**Fix.** `src/server/ownership.ts`: when AgentView starts a dev server, it resolves which PID listens on the candidate port (`lsof`) and verifies that process descends from the tree it spawned. Foreign owners are rejected; if only a foreign owner is ever reachable, the run ends as `SERVER_PORT_CONFLICT` naming the process. Re-running the same broken fixture afterwards:
+**Fix.** `src/server/ownership.ts`: when LocalhostFix starts a dev server, it resolves which PID listens on the candidate port (`lsof`) and verifies that process descends from the tree it spawned. Foreign owners are rejected; if only a foreign owner is ever reachable, the run ends as `SERVER_PORT_CONFLICT` naming the process. Re-running the same broken fixture afterwards:
 
 ```
 SERVER_PORT_CONFLICT (confidence: high)
- - http://localhost:4599 is reachable but is served by a process AgentView
+ - http://localhost:4599 is reachable but is served by a process LocalhostFix
    did not start: Python (pid 51789)
  - Inspecting it would have verified a different application than the one
    being developed.
-Next action: Stop whatever is already using that port, or point AgentView at
-the right one … AgentView will not terminate a process it did not start.
+Next action: Stop whatever is already using that port, or point LocalhostFix at
+the right one … LocalhostFix will not terminate a process it did not start.
 ```
 
 **Regression test.** `test/integration/artifacts.test.ts` → "a dev server advertising a port owned by someone else is a conflict, not a healthy render".
@@ -48,11 +48,11 @@ the right one … AgentView will not terminate a process it did not start.
 
 ## Defect 2 — reusing a *neighbouring project's* dev server
 
-**How it surfaced.** Running against the real project produced `HEALTHY_RENDER` at `http://localhost:3000`. Reading the captured screenshot showed a completely different product — an app called "Project B" — whose dev server already owned port 3000. AgentView had reused it because 3000 is the Next.js default.
+**How it surfaced.** Running against the real project produced `HEALTHY_RENDER` at `http://localhost:3000`. Reading the captured screenshot showed a completely different product — an app called "Project B" — whose dev server already owned port 3000. LocalhostFix had reused it because 3000 is the Next.js default.
 
 This one is instructive: the verdict, the status code, and the element counts were all "fine". Only *looking at the screenshot* exposed it, which is precisely the discipline the tool asks agents to follow.
 
-**Fix.** The reuse path now verifies the listening process's working directory against the project root (`checkServerProject`). A server belonging to a different project is skipped rather than reused, AgentView starts its own instead, and the report records what was skipped and why. `--allow-foreign-server` is the deliberate opt-out.
+**Fix.** The reuse path now verifies the listening process's working directory against the project root (`checkServerProject`). A server belonging to a different project is skipped rather than reused, LocalhostFix starts its own instead, and the report records what was skipped and why. `--allow-foreign-server` is the deliberate opt-out.
 
 ---
 
@@ -68,11 +68,11 @@ This one is instructive: the verdict, the status code, and the element counts we
 
 ## Defect 4 — picking the wrong server among several in the same project
 
-**How it surfaced.** With directory matching working, AgentView chose `http://localhost:4620` — a leftover `python -m http.server` running inside the project directory — while the actual Next.js dev server was on **3005**. Both legitimately belonged to the project, so both matched; ordering was arbitrary.
+**How it surfaced.** With directory matching working, LocalhostFix chose `http://localhost:4620` — a leftover `python -m http.server` running inside the project directory — while the actual Next.js dev server was on **3005**. Both legitimately belonged to the project, so both matched; ordering was arbitrary.
 
 **Fix.** `FrameworkAdapter` gained `devProcessPatterns`, and discovered servers are ranked by whether the owning process looks like that framework's dev server (`next-server`, `vite`, …). The Next.js server now wins.
 
-**Bonus capability.** This work produced something better than the original design: AgentView now **discovers a running dev server for the project on any port**, by enumerating listeners and matching working directories. The brief's "which port does it actually use?" pain point is answered without the developer configuring anything — port 3005 was found with no config file present.
+**Bonus capability.** This work produced something better than the original design: LocalhostFix now **discovers a running dev server for the project on any port**, by enumerating listeners and matching working directories. The brief's "which port does it actually use?" pain point is answered without the developer configuring anything — port 3005 was found with no config file present.
 
 ---
 
@@ -88,36 +88,36 @@ This one is instructive: the verdict, the status code, and the element counts we
 
 ## Final verified runs against the real application
 
-All commands run from `/Users/example/project-a` with no AgentView config present.
+All commands run from `/Users/example/project-a` with no LocalhostFix config present.
 
-### `agentview doctor`
+### `localhostfix doctor`
 
 ```
-  AGENTVIEW DOCTOR
+  LOCALHOSTFIX DOCTOR
 
   Project
   ✓ Project root: /Users/example/project-a
   ✓ Framework: Next.js
   ✓ Package manager: npm
   ✓ Development command: npm run dev
-  ! No AgentView config yet (defaults in use) — run `agentview setup`
+  ! No LocalhostFix config yet (defaults in use) — run `localhostfix setup`
 
   Server
   ✓ Already running and reachable: http://localhost:3000 (HTTP 200)
 
   Browser
-  ✓ Playwright package available (bundled with AgentView)
+  ✓ Playwright package available (bundled with LocalhostFix)
   ✓ Chromium executable: …/ms-playwright/chromium-1234/…/Google Chrome for Testing
   ✓ Chromium launches successfully
 
   Claude integration
-  ! Project skill not installed — run `agentview setup --claude`
+  ! Project skill not installed — run `localhostfix setup --claude`
   ! Automatic verification hook not enabled
 ```
 
 Known limitation visible here — **since fixed**: `doctor` probed only the configured/default port for its "already running" line, so it reported the neighbouring app on 3000 as though it were this project's. `inspect` already performed full project-ownership discovery, and the two disagreeing was itself the bug. Both now share `src/server/discovery.ts`; see the [release-candidate section](#release-candidate-dogfood-2026-08-07) for the corrected output.
 
-### `agentview inspect` — healthy render
+### `localhostfix inspect` — healthy render
 
 ```
 HEALTHY_RENDER (confidence: high)
@@ -138,7 +138,7 @@ Exit code `0`. Artifacts (copied into this repo as evidence):
 
 Both screenshots were opened and confirmed to show the correct application.
 
-### `agentview inspect /this-route-does-not-exist` — failure and diagnosis
+### `localhostfix inspect /this-route-does-not-exist` — failure and diagnosis
 
 ```
 ROUTE_NOT_FOUND (confidence: high)
@@ -152,25 +152,25 @@ Exit code `1` (application domain — correctly *not* blamed on tooling). Artifa
 
 ### Recovery and second inspection
 
-Re-running `agentview inspect` on the valid route after the 404 returned `HEALTHY_RENDER` with exit code `0`, confirming the failure was route-specific and that no state leaked between runs.
+Re-running `localhostfix inspect` on the valid route after the 404 returned `HEALTHY_RENDER` with exit code `0`, confirming the failure was route-specific and that no state leaked between runs.
 
 ### Exit-code verification
 
 ```
-$ agentview inspect /nope   → exit 1   (application problem)
-$ agentview inspect         → exit 0   (healthy)
+$ localhostfix inspect /nope   → exit 1   (application problem)
+$ localhostfix inspect         → exit 0   (healthy)
 ```
 
 ---
 
 ## Process-hygiene verification
 
-Across every dogfood run AgentView **reused** the developer's existing dev server and never terminated it — the Next.js server on 3005 and the Python server on 4620 were both still running afterwards. No process AgentView did not start was ever signalled. The integration suite additionally asserts that servers AgentView *does* start are stopped and their ports freed.
+Across every dogfood run LocalhostFix **reused** the developer's existing dev server and never terminated it — the Next.js server on 3005 and the Python server on 4620 were both still running afterwards. No process LocalhostFix did not start was ever signalled. The integration suite additionally asserts that servers LocalhostFix *does* start are stopped and their ports freed.
 
 ## Known limitations exposed by dogfooding
 
 1. ~~**`doctor` and `inspect` use different server-discovery logic.**~~ **Fixed in the hardening pass** — both now use `src/server/discovery.ts`, and a regression test asserts `doctor` cannot report a foreign project's server as this project's.
-2. **Port-ownership checks depend on `lsof`.** On systems without it (some containers) ownership resolves to `unknown` and AgentView proceeds without the safety net rather than blocking. Correct behaviour, but the guarantee is weaker there.
+2. **Port-ownership checks depend on `lsof`.** On systems without it (some containers) ownership resolves to `unknown` and LocalhostFix proceeds without the safety net rather than blocking. Correct behaviour, but the guarantee is weaker there.
 3. **`visibleTextLength` counts only elements visible at load.** Scroll-reveal sections that start at `opacity: 0` are excluded, so text counts understate content on animation-heavy pages. This affects the blank heuristic's inputs, though the conservative thresholds absorbed it here.
 4. **Only the first screenful is pixel-sampled.** A page that renders correctly above the fold but is broken far below would not be caught by the uniformity signal.
 5. **Mobile emulation uses Pixel 7 under Chromium.** Faithful for Android and for `pointer: coarse` media queries; it is not iOS/WebKit rendering.
@@ -185,9 +185,9 @@ Re-run after the hardening pass that aligned `doctor` with `inspect`, added the
 `ProcessInspector`, and moved the localhost guard into discovery.
 
 Target again: `/Users/example/project-a` (Next.js 16.2.9),
-read-only. No `agentview setup` was run there, so its `.gitignore` was never
-touched; the only writes were to `.agentview/`, removed afterwards. Verified
-clean at the end: directory absent, zero AgentView entries in `git status`,
+read-only. No `localhostfix setup` was run there, so its `.gitignore` was never
+touched; the only writes were to `.localhostfix/`, removed afterwards. Verified
+clean at the end: directory absent, zero LocalhostFix entries in `git status`,
 `.gitignore` unchanged.
 
 ## The decisive scenario
@@ -201,7 +201,7 @@ exists to prevent:
 | 3005 | The real example-next-app Next.js dev server |
 | 4599, 4620 | Leftover `python -m http.server` processes inside the project |
 
-`agentview doctor --no-server`, verbatim:
+`localhostfix doctor --no-server`, verbatim:
 
 ```
   Configured URL
@@ -221,7 +221,7 @@ exists to prevent:
 
   Recommended actions
   1. The configured port is serving another project. Inspecting it would verify the wrong application.
-  2. Update AgentView configuration to port 3005 — run `agentview doctor --fix`.
+  2. Update LocalhostFix configuration to port 3005 — run `localhostfix doctor --fix`.
 ```
 
 Exit code `2`. Before this pass, `doctor` probed only the configured port and
@@ -230,7 +230,7 @@ health for someone else's application. That regression is now covered by
 `test/integration/wrong-project.test.ts`, which asserts `doctor` names the
 offending directory and does not exit 0.
 
-`agentview inspect` on the same machine state selected the correct server
+`localhostfix inspect` on the same machine state selected the correct server
 without any configuration:
 
 ```
@@ -267,10 +267,10 @@ working directory rather than simulating one.
 **A missing dev command was reported too early.** `inspect` bailed with
 `DEV_COMMAND_NOT_FOUND` before discovery ran, so a project whose server was
 already running still failed if it had no dev script. The check now happens
-only when nothing is running and AgentView actually needs to start something.
+only when nothing is running and LocalhostFix actually needs to start something.
 
 **`doctor` could contact a remote host.** It probed a configured URL without
-checking it was localhost, so a remote `url` in `.agentview/config.json` would
+checking it was localhost, so a remote `url` in `.localhostfix/config.json` would
 have been contacted without `--allow-remote`. The guard now lives inside
 `discoverServers`, the only code that makes requests, so no caller can bypass
 it. Covered by a test using an unroutable TEST-NET-3 address.
@@ -294,12 +294,12 @@ naming it.
 
 1. **Scroll-reveal content is not counted or captured.** The example-next-app
    full-page screenshot shows large empty regions because sections start at
-   `opacity: 0` and animate in on scroll. AgentView captures the page as it is
+   `opacity: 0` and animate in on scroll. LocalhostFix captures the page as it is
    at load, so `visibleTextLength` understates content on animation-heavy
    pages. The conservative blank thresholds absorb this, but a page whose
    content *only* appears after scrolling would look sparser than it is.
 2. **Port-ownership checks depend on OS process inspection.** Where
-   unavailable, ownership is `unknown` and AgentView proceeds without the
+   unavailable, ownership is `unknown` and LocalhostFix proceeds without the
    safety net rather than blocking. Windows has no implementation at all — see
    `docs/PLATFORM_SUPPORT.md`.
 3. **Only the first screenful is pixel-sampled**, so breakage far below the

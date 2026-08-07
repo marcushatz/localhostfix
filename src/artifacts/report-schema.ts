@@ -19,7 +19,7 @@ export const BlankAssessmentSchema = z.object({
 
 export const InspectionReportSchema = z.object({
   schemaVersion: z.literal(1),
-  tool: z.object({ name: z.literal('agentview'), version: z.string() }),
+  tool: z.object({ name: z.literal('localhostfix'), version: z.string() }),
   startedAt: z.string(),
   durationMs: z.number().nonnegative(),
   verdict: z.enum(VERDICTS),
@@ -31,7 +31,7 @@ export const InspectionReportSchema = z.object({
   url: z.string().nullable(),
   server: z.object({
     reachable: z.boolean(),
-    startedByAgentView: z.boolean(),
+    startedByLocalhostFix: z.boolean(),
     reusedExisting: z.boolean(),
     command: z.string().nullable(),
     expectedPort: z.number().nullable(),

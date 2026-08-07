@@ -67,7 +67,7 @@ describe('inspection pipeline', () => {
 
       // Reports in both formats, and the latest pointer refreshed.
       expect(fs.existsSync(path.join(runDir, 'report.md'))).toBe(true);
-      expect(fs.existsSync(path.join(dir, '.agentview', 'latest', 'report.json'))).toBe(true);
+      expect(fs.existsSync(path.join(dir, '.localhostfix', 'latest', 'report.json'))).toBe(true);
     },
     TIMEOUT,
   );
@@ -170,9 +170,9 @@ describe('server-layer failures', () => {
     async () => {
       const dir = fixture('hangs', HANG_SOURCE);
       // Write a short timeout so the test does not wait the 60s default.
-      fs.mkdirSync(path.join(dir, '.agentview'), { recursive: true });
+      fs.mkdirSync(path.join(dir, '.localhostfix'), { recursive: true });
       fs.writeFileSync(
-        path.join(dir, '.agentview', 'config.json'),
+        path.join(dir, '.localhostfix', 'config.json'),
         JSON.stringify({ startupTimeoutMs: 4000 }),
       );
       const { report } = await runInspection({ cwd: dir });
@@ -203,9 +203,9 @@ describe('server-layer failures', () => {
       // Must be a port nothing is listening on: a configured port that IS
       // reachable would be reused on purpose, which is different behaviour.
       const freePort = await findFreePort();
-      fs.mkdirSync(path.join(dir, '.agentview'), { recursive: true });
+      fs.mkdirSync(path.join(dir, '.localhostfix'), { recursive: true });
       fs.writeFileSync(
-        path.join(dir, '.agentview', 'config.json'),
+        path.join(dir, '.localhostfix', 'config.json'),
         JSON.stringify({ expectedPort: freePort, startupTimeoutMs: 30000 }),
       );
       const { report } = await runInspection({ cwd: dir });
@@ -235,19 +235,28 @@ describe('server-layer failures', () => {
 
 describe('process hygiene', () => {
   test(
-    'servers AgentView starts are stopped, and its own port is freed',
+    'servers LocalhostFix starts are stopped, and its own port is freed',
     async () => {
       const dir = fixture('cleanup', serverSource(HEALTHY_HANDLER));
       const { report } = await runInspection({ cwd: dir });
-      expect(report.server.startedByAgentView).toBe(true);
+      expect(report.server.startedByLocalhostFix).toBe(true);
 
       const url = report.server.actualUrl!;
-      await new Promise((r) => setTimeout(r, 1500));
-      // The port must no longer answer once the run finished.
-      const reachable = await fetch(url, { signal: AbortSignal.timeout(1500) })
-        .then(() => true)
-        .catch(() => false);
-      expect(reachable).toBe(false);
+      // Poll rather than sleeping a fixed interval: SIGTERM to actual exit
+      // takes longer on a loaded machine or a CI runner, and a single check
+      // after a fixed delay made this test flaky.
+      const freedWithin = async (deadlineMs: number): Promise<boolean> => {
+        const deadline = Date.now() + deadlineMs;
+        for (;;) {
+          const reachable = await fetch(url, { signal: AbortSignal.timeout(1000) })
+            .then(() => true)
+            .catch(() => false);
+          if (!reachable) return true;
+          if (Date.now() >= deadline) return false;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      };
+      expect(await freedWithin(15_000)).toBe(true);
     },
     TIMEOUT,
   );

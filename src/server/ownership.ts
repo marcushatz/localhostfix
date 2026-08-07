@@ -58,7 +58,7 @@ export type OwnershipCheck =
   | { status: 'unknown'; owners: PortOwner[] };
 
 /**
- * Whether the process serving `port` belongs to the tree AgentView spawned.
+ * Whether the process serving `port` belongs to the tree LocalhostFix spawned.
  * "unknown" means we could not tell; callers must treat that as informational
  * and never as a match.
  */
@@ -127,7 +127,7 @@ export function checkServerProject(port: number, projectRoot: string): ProjectMa
  *
  * `contains` is deliberately distinct from `inside`: a daemon whose cwd is
  * "/" contains every project on the machine, and treating that as a match
- * once caused AgentView to inspect macOS AirPlay on port 7000 instead of the
+ * once caused LocalhostFix to inspect macOS AirPlay on port 7000 instead of the
  * developer's app.
  */
 export type CwdRelation = 'inside' | 'contains' | 'unrelated';

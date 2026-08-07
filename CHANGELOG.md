@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to AgentView are documented here. The format follows
+All notable changes to LocalhostFix are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/). While the major version is
 `0`, minor releases may contain breaking changes; the `report.json`
@@ -9,13 +9,30 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
 
 ## [Unreleased]
 
-### Added — `agentview fix` (2026-08-07)
+### Changed — renamed to LocalhostFix (2026-08-07)
+
+- The project was renamed from its working name "AgentView" to **LocalhostFix**
+  before any public release. The npm package, CLI binary, and GitHub repository
+  are all `localhostfix`, each verified available from the terminal — see
+  docs/NAMING.md for the evidence and for why the previous name was abandoned.
+- Generated paths moved: `.agentview/` → `.localhostfix/`, and the Claude Code
+  skill from `.claude/skills/agentview/` to `.claude/skills/localhostfix/`.
+  Hook entries are tagged `localhostfix-hook`.
+- **Legacy handling, deliberately minimal.** Because nothing was ever published,
+  there is no migration system. `doctor` and `setup` print a one-line notice
+  when a pre-rename `.agentview/` directory is present, suggesting
+  `mv .agentview .localhostfix`. Nothing is moved or deleted automatically and
+  no command reads the old directory. `legacyDirNotice()` in
+  `src/config/config.ts` is marked for removal once no development machine
+  still has one.
+
+### Added — `localhostfix fix` (2026-08-07)
 
 - New command that attempts safe recovery of frontend inspection and then
   **verifies** whether it works again. It reuses the discovery and diagnosis
   code behind `doctor` and `inspect`; there is no parallel logic.
 - Repairs automatically: a wrong stored port, a dev server that is not running,
-  a dev server needing longer to become ready, a corrupt `.agentview/config.json`
+  a dev server needing longer to become ready, a corrupt `.localhostfix/config.json`
   (backed up before regeneration), and a stale inspection lock from a crashed run.
 - Requires explicit approval (`--yes`) before installing the Chromium build.
 - Diagnoses without acting: application crashes, blank renders, failed APIs,
@@ -33,7 +50,7 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
   `doctor` previously probed only the configured port and could therefore
   report a project as healthy because *something* answered there.
 - New `MULTIPLE_PROJECT_SERVERS` verdict: when several servers run inside the
-  project and none is clearly the dev server, AgentView reports the ambiguity
+  project and none is clearly the dev server, LocalhostFix reports the ambiguity
   and asks for `--url` instead of guessing.
 - A missing dev command is now an error only when no project server is
   already running.
@@ -57,15 +74,15 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
 
 ### Added — 0.1.0 (not yet released)
 
-- `agentview inspect` — one-shot rendered-frontend verification producing
+- `localhostfix inspect` — one-shot rendered-frontend verification producing
   desktop and mobile screenshots, console/network/page-error diagnostics, an
   accessibility snapshot, and Markdown + JSON reports.
-- `agentview doctor` — layered health check of the project, dev server,
+- `localhostfix doctor` — layered health check of the project, dev server,
   browser, and agent integration, with `--fix` for safe repairs.
-- `agentview setup` — framework, package-manager, dev-command and port
+- `localhostfix setup` — framework, package-manager, dev-command and port
   detection; project configuration; `.gitignore` entries; optional Claude Code
   integration via `--claude`.
-- `agentview watch`, `agentview status`, `agentview clean`.
+- `localhostfix watch`, `localhostfix status`, `localhostfix clean`.
 - Layered failure model with 17 verdicts, each mapped to an inspection layer,
   a domain (`setup` / `application` / `healthy` / `unknown`), and a stable
   exit code.
@@ -74,7 +91,7 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
 - Dev-server discovery that finds a project's server **on any port** by
   matching listening processes' working directories, and ranks candidates by
   whether they look like the framework's dev server.
-- Port-ownership verification preventing AgentView from inspecting — and
+- Port-ownership verification preventing LocalhostFix from inspecting — and
   reporting on — an application other than the one under development.
 - Redaction of sensitive headers and query parameters; request and response
   bodies are never stored.

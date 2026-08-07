@@ -16,7 +16,7 @@ describe('redactHeaders', () => {
   });
 
   test('leaves benign headers untouched', () => {
-    const headers = { accept: 'text/html', 'user-agent': 'agentview' };
+    const headers = { accept: 'text/html', 'user-agent': 'localhostfix' };
     expect(redactHeaders(headers)).toEqual(headers);
   });
 });

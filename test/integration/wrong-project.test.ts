@@ -13,7 +13,7 @@ import { nextAdapter, genericAdapter } from '../../src/frameworks/adapter.js';
  * Regression suite for the dogfood finding that motivated this tool:
  *
  *   A healthy page answering on localhost is NOT evidence that it belongs to
- *   the project being worked on. AgentView once reported HEALTHY_RENDER for a
+ *   the project being worked on. LocalhostFix once reported HEALTHY_RENDER for a
  *   completely different application that happened to own port 3000.
  *
  * Servers here are spawned as real child processes with an explicit `cwd`, so
@@ -42,7 +42,7 @@ server.listen(Number(process.env.PORT ?? 0), () => {
 
 /**
  * Spawn a server as a child process whose working directory is `cwd` and
- * whose command line contains `scriptName` — the two signals AgentView uses
+ * whose command line contains `scriptName` — the two signals LocalhostFix uses
  * to attribute a listener to a project.
  */
 async function spawnServer(cwd: string, scriptName: string, title: string): Promise<number> {
@@ -80,14 +80,14 @@ async function spawnServer(cwd: string, scriptName: string, title: string): Prom
 
 /** A healthy server belonging to some OTHER directory entirely. */
 async function startForeignServer(): Promise<{ port: number; cwd: string }> {
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'agentview-otherproject-'));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'localhostfix-otherproject-'));
   cleanups.push(() => fs.rmSync(cwd, { recursive: true, force: true }));
   const port = await spawnServer(cwd, 'other-app-server.mjs', 'A Completely Different Product');
   return { port, cwd };
 }
 
 function makeProject(files: Record<string, string> = {}): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentview-project-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'localhostfix-project-'));
   fs.writeFileSync(
     path.join(dir, 'package.json'),
     JSON.stringify({ name: 'my-project', private: true, dependencies: { next: '16.0.0' } }),
@@ -129,7 +129,7 @@ describe('a healthy page on the configured port owned by another project', () =>
     async () => {
       const foreign = await startForeignServer();
       const project = makeProject({
-        '.agentview/config.json': JSON.stringify({ expectedPort: foreign.port }),
+        '.localhostfix/config.json': JSON.stringify({ expectedPort: foreign.port }),
       });
 
       const doctor = await runDoctor({ cwd: project, fix: false, startServer: false });
@@ -152,7 +152,7 @@ describe('a healthy page on the configured port owned by another project', () =>
       // No dev command: the only route to "success" would be wrongly
       // accepting the foreign server.
       const project = makeProject({
-        '.agentview/config.json': JSON.stringify({
+        '.localhostfix/config.json': JSON.stringify({
           expectedPort: foreign.port,
           startupTimeoutMs: 3000,
         }),
@@ -197,7 +197,7 @@ describe("the project's own server on a non-standard port", () => {
     async () => {
       const foreign = await startForeignServer();
       const project = makeProject({
-        '.agentview/config.json': JSON.stringify({ expectedPort: foreign.port }),
+        '.localhostfix/config.json': JSON.stringify({ expectedPort: foreign.port }),
       });
       const realPort = await spawnServer(project, 'next-server.mjs', 'The Real App');
 
@@ -237,7 +237,7 @@ describe('several servers inside one project', () => {
     'indistinguishable servers are reported as ambiguous rather than guessed',
     async () => {
       // Under the generic adapter both are plain `node` processes, so there
-      // is no principled way to choose. AgentView must say so.
+      // is no principled way to choose. LocalhostFix must say so.
       const project = makeProject();
       fs.writeFileSync(
         path.join(project, 'package.json'),

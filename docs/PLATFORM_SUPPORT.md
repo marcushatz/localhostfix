@@ -9,7 +9,7 @@ These are used strictly. "It compiles" and "the unit tests pass" are **not** sup
 | **Verified** | Exercised on this OS by the integration suite or by hand, with the result checked |
 | **Expected** | Implemented deliberately for this OS, with unit coverage of its parsing logic, but **never run on that OS** |
 | **Untested** | Should work in principle; nobody has confirmed it and there is no targeted coverage |
-| **Unsupported** | Known not to work; AgentView reports the limitation rather than guessing |
+| **Unsupported** | Known not to work; LocalhostFix reports the limitation rather than guessing |
 
 Only macOS is Verified for v0.1.
 
@@ -24,11 +24,11 @@ Only macOS is Verified for v0.1.
 | Screenshots (desktop + mobile) | Verified | Expected | Untested |
 | Claude integration (skill + hooks) | Verified | Expected | Expected |
 | Watch mode | Verified | Expected | Untested |
-| Safe cleanup (stopping only servers AgentView started) | Verified | Expected | Degraded |
+| Safe cleanup (stopping only servers LocalhostFix started) | Verified | Expected | Degraded |
 
 ## What is actually OS-specific
 
-Almost all of it is one module. `src/platform/` defines a `ProcessInspector` interface with four operations — list listening ports, read process working directories and command lines, resolve a parent PID, and terminate a process tree AgentView started. Everything else in the codebase is portable Node.
+Almost all of it is one module. `src/platform/` defines a `ProcessInspector` interface with four operations — list listening ports, read process working directories and command lines, resolve a parent PID, and terminate a process tree LocalhostFix started. Everything else in the codebase is portable Node.
 
 Adding a platform means implementing that interface. Nothing else needs to change.
 
@@ -63,13 +63,13 @@ Two things genuinely do not work, and both are load-bearing:
 1. **Process inspection.** `lsof` and `/proc` do not exist. Windows needs `netstat -ano`, `Get-NetTCPConnection`, or WMI/CIM, plus a different way to read a process's working directory (which Windows does not expose as readily as POSIX). No approximation is shipped, because a wrong answer here means inspecting the wrong application — the precise failure this tool exists to prevent.
 2. **Process-group termination.** POSIX negative-PID signalling has no Windows equivalent; cleanup would need `taskkill /T /F`. The fallback signals only the spawned process, so a dev server's grandchildren could survive.
 
-AgentView does not pretend otherwise on Windows. `unsupportedInspector` returns nothing, `doctor` prints *"Process inspection unavailable on this system"*, and ownership is reported as unknown rather than assumed. The rest of the tool — project detection, launching Chromium, screenshots, reports, Claude integration — is plain Node and Playwright, and should work, but is Untested.
+LocalhostFix does not pretend otherwise on Windows. `unsupportedInspector` returns nothing, `doctor` prints *"Process inspection unavailable on this system"*, and ownership is reported as unknown rather than assumed. The rest of the tool — project detection, launching Chromium, screenshots, reports, Claude integration — is plain Node and Playwright, and should work, but is Untested.
 
 **Windows support is explicitly post-v0.1.** Shipping a fragile approximation would be worse than the honest gap, because the whole value of the tool is that its answers can be trusted.
 
 ## Degrading safely
 
-Where ownership cannot be established, AgentView says so and continues without the safety net rather than blocking or guessing:
+Where ownership cannot be established, LocalhostFix says so and continues without the safety net rather than blocking or guessing:
 
 - `doctor` reports process inspection as unavailable in the Port ownership section.
 - Discovery marks `ownershipUnavailable: true` in the result, and reports neither project servers nor foreign servers — unknown is unknown in both directions.

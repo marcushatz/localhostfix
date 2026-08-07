@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { loadConfig } from '../config/config.js';
-import type { AgentViewConfig } from '../config/schema.js';
+import type { LocalhostFixConfig } from '../config/schema.js';
 import { findProjectRoot, detectPackageManager, runScriptCommand } from '../project/discover.js';
 import { adapterById, detectDevScript, detectFramework, type FrameworkAdapter } from '../frameworks/adapter.js';
 import { ensureServer, writeServerLog, type ServerHandle } from '../server/lifecycle.js';
@@ -74,13 +74,13 @@ export async function runInspection(opts: InspectOptions): Promise<InspectOutcom
         kind: 'no-project',
         detail: `no package.json, dev command, or URL override found starting from ${opts.cwd}`,
       },
-    ], 'Run `agentview setup` inside a Node.js project, or set "url"/"devCommand" in .agentview/config.json.');
+    ], 'Run `localhostfix setup` inside a Node.js project, or set "url"/"devCommand" in .localhostfix/config.json.');
   }
   // Privacy guard: refuse non-local URLs unless explicitly allowed.
   if (explicitUrl && !isLocalUrl(explicitUrl) && !(opts.allowRemote ?? config.allowRemote)) {
     return builder.finish('PROJECT_NOT_RECOGNIZED', 'high', [
       { kind: 'remote-url-blocked', detail: `${explicitUrl} is not a localhost URL` },
-    ], 'AgentView inspects localhost only by default. Pass --allow-remote (and understand the privacy implications) to override.');
+    ], 'LocalhostFix inspects localhost only by default. Pass --allow-remote (and understand the privacy implications) to override.');
   }
 
   // Layer 1-2: server + reachability.
@@ -105,7 +105,7 @@ export async function runInspection(opts: InspectOptions): Promise<InspectOutcom
             kind: 'no-dev-script',
             detail: `no server is running for this project, and package.json has no ${adapter.devScriptCandidates.map((s) => `"${s}"`).join('/')} script`,
           },
-        ], 'Start your dev server, add a dev script to package.json, or set "devCommand" in .agentview/config.json.');
+        ], 'Start your dev server, add a dev script to package.json, or set "devCommand" in .localhostfix/config.json.');
       }
       if (result.kind === 'MULTIPLE_PROJECT_SERVERS') {
         const d = result.discovery;
@@ -121,7 +121,7 @@ export async function runInspection(opts: InspectOptions): Promise<InspectOutcom
           ...(d.preferred
             ? [{ kind: 'preferred', detail: `Best guess: port ${d.preferred.port}` }]
             : []),
-        ], `AgentView will not guess which server is your app. Re-run with --url http://localhost:<port>, or stop the servers you are not using.`);
+        ], `LocalhostFix will not guess which server is your app. Re-run with --url http://localhost:<port>, or stop the servers you are not using.`);
       }
       fs.writeFileSync(path.join(runDir, 'server.log'), result.log);
       builder.artifacts.serverLog = 'server.log';
@@ -139,25 +139,25 @@ export async function runInspection(opts: InspectOptions): Promise<InspectOutcom
         return builder.finish('SERVER_PORT_CONFLICT', 'high', [
           {
             kind: 'foreign-port-owner',
-            detail: `${result.url} is reachable but is served by a process AgentView did not start: ${result.owners.map((o) => `${o.command} (pid ${o.pid})`).join(', ')}`,
+            detail: `${result.url} is reachable but is served by a process LocalhostFix did not start: ${result.owners.map((o) => `${o.command} (pid ${o.pid})`).join(', ')}`,
           },
           {
             kind: 'wrong-app-risk',
             detail: 'Inspecting it would have verified a different application than the one being developed.',
           },
-        ], `Stop whatever is already using that port, or point AgentView at the right one via "url"/"expectedPort" in .agentview/config.json. AgentView will not terminate a process it did not start.`);
+        ], `Stop whatever is already using that port, or point LocalhostFix at the right one via "url"/"expectedPort" in .localhostfix/config.json. LocalhostFix will not terminate a process it did not start.`);
       }
       return builder.finish('SERVER_START_TIMEOUT', 'high', [
         {
           kind: 'timeout',
           detail: `no probed URL became reachable within ${config.startupTimeoutMs}ms (tried: ${result.probedUrls.join(', ') || 'none discovered'})`,
         },
-      ], 'The server may be slow or printing an unrecognized URL. Increase startupTimeoutMs or set "url" explicitly in .agentview/config.json.');
+      ], 'The server may be slow or printing an unrecognized URL. Increase startupTimeoutMs or set "url" explicitly in .localhostfix/config.json.');
     }
     server = result.handle;
     builder.server.reachable = true;
     builder.server.reusedExisting = !server.startedByUs;
-    builder.server.startedByAgentView = server.startedByUs;
+    builder.server.startedByLocalhostFix = server.startedByUs;
     builder.server.actualUrl = server.url;
     builder.server.ownership = server.ownership;
     builder.server.skippedForeign = server.skippedForeign.map((f) => ({
@@ -185,7 +185,7 @@ export async function runInspection(opts: InspectOptions): Promise<InspectOutcom
         { kind: 'browser-launch', detail: launch.detail },
       ], launch.kind === 'BROWSER_NOT_INSTALLED'
         ? 'Install the supported Chromium build: npx playwright install chromium'
-        : 'Chromium failed to launch. Re-run `agentview doctor` and check the error detail.');
+        : 'Chromium failed to launch. Re-run `localhostfix doctor` and check the error detail.');
     }
     builder.browser.launched = true;
 
@@ -243,7 +243,7 @@ class ReportBuilder {
   url: string | null = null;
   server: InspectionReport['server'] = {
     reachable: false,
-    startedByAgentView: false,
+    startedByLocalhostFix: false,
     reusedExisting: false,
     command: null,
     expectedPort: null,
@@ -297,7 +297,7 @@ class ReportBuilder {
   ): InspectOutcome {
     const report: InspectionReport = {
       schemaVersion: 1,
-      tool: { name: 'agentview', version: toolVersion() },
+      tool: { name: 'localhostfix', version: toolVersion() },
       startedAt: this.startedAt.toISOString(),
       durationMs: Date.now() - this.startedAt.getTime(),
       verdict,

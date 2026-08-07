@@ -55,7 +55,7 @@ describe('report.json contract', () => {
     'an early failure still writes a schema-valid report',
     async () => {
       // No package.json anywhere: fails at the very first layer.
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentview-empty-'));
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'localhostfix-empty-'));
       try {
         const { runDir } = await runInspection({ cwd: dir });
         const raw = JSON.parse(fs.readFileSync(path.join(runDir, 'report.json'), 'utf8'));
@@ -77,7 +77,7 @@ describe('report.json contract', () => {
       const { runDir } = await runInspection({ cwd: dir });
       const md = fs.readFileSync(path.join(runDir, 'report.md'), 'utf8');
 
-      expect(md).toMatch(/# AgentView Frontend Inspection/);
+      expect(md).toMatch(/# LocalhostFix Frontend Inspection/);
       expect(md).toMatch(/Result: \*\*HEALTHY_RENDER\*\*/);
       expect(md).toMatch(/## Layers/);
       expect(md).toMatch(/## Recommended next action/);
@@ -110,9 +110,9 @@ describe('port ownership', () => {
             announce: `\`  ➜  Local:   http://localhost:${foreignPort}/\``,
           }),
         );
-        fs.mkdirSync(path.join(dir, '.agentview'), { recursive: true });
+        fs.mkdirSync(path.join(dir, '.localhostfix'), { recursive: true });
         fs.writeFileSync(
-          path.join(dir, '.agentview', 'config.json'),
+          path.join(dir, '.localhostfix', 'config.json'),
           JSON.stringify({ startupTimeoutMs: 6000 }),
         );
 
@@ -137,7 +137,7 @@ describe('browser layer', () => {
     async () => {
       // Playwright resolves its browser cache location at import time, so the
       // only faithful simulation is a fresh process pointed at an empty cache.
-      const emptyCache = fs.mkdtempSync(path.join(os.tmpdir(), 'agentview-nobrowser-'));
+      const emptyCache = fs.mkdtempSync(path.join(os.tmpdir(), 'localhostfix-nobrowser-'));
       try {
         const dir = fixture('nobrowser', serverSource(HEALTHY_HANDLER));
         const report = runCliJson(dir, { PLAYWRIGHT_BROWSERS_PATH: emptyCache });

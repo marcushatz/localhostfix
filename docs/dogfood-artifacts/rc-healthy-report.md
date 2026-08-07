@@ -1,4 +1,4 @@
-# AgentView Frontend Inspection
+# LocalhostFix Frontend Inspection
 
 Result: **HEALTHY_RENDER** (confidence: high)
 

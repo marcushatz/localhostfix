@@ -25,7 +25,7 @@ export function probeUrl(url: string, timeoutMs = 3000): Promise<ProbeResult> {
     let req: http.ClientRequest;
     try {
       const lib = url.startsWith('https:') ? https : http;
-      req = lib.get(url, { timeout: timeoutMs, headers: { 'user-agent': 'agentview-probe' } }, (res) => {
+      req = lib.get(url, { timeout: timeoutMs, headers: { 'user-agent': 'localhostfix-probe' } }, (res) => {
         res.resume();
         done({ ok: true, status: res.statusCode ?? null, error: null });
       });

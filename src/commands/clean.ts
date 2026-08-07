@@ -2,16 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import pc from 'picocolors';
 import type { Command } from 'commander';
-import { agentviewDir } from '../config/config.js';
+import { localhostfixDir } from '../config/config.js';
 import { findProjectRoot } from '../project/discover.js';
 
 export function registerCleanCommand(program: Command): void {
   program
     .command('clean')
-    .description('Remove AgentView-generated runs, latest artifacts, and state (keeps config.json)')
+    .description('Remove LocalhostFix-generated runs, latest artifacts, and state (keeps config.json)')
     .action(() => {
       const project = findProjectRoot(process.cwd());
-      const dir = agentviewDir(project.root);
+      const dir = localhostfixDir(project.root);
       let removed = 0;
       for (const sub of ['runs', 'latest', 'state']) {
         const target = path.join(dir, sub);

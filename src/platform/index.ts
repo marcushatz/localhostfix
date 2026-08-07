@@ -6,7 +6,7 @@ export type { PortOwner, ProcessDetail, ProcessInspector } from './types.js';
 
 /**
  * Platform with no process-inspection support. Everything returns empty, so
- * AgentView reports ownership as unknown and says so in `doctor` — it never
+ * LocalhostFix reports ownership as unknown and says so in `doctor` — it never
  * silently guesses that a server belongs to the project.
  */
 export const unsupportedInspector: ProcessInspector = {

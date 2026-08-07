@@ -1,6 +1,6 @@
 /**
  * Fixture dev servers. Each is a tiny standalone Node HTTP server written to
- * a temp directory with a package.json, so the full AgentView pipeline
+ * a temp directory with a package.json, so the full LocalhostFix pipeline
  * (spawn → discover URL → probe → inspect) runs exactly as it would on a
  * real project. No external network access.
  */
@@ -29,7 +29,7 @@ export const healthyBody = `
 </div>`;
 
 export function makeFixture(name: string, serverSource: string, extra: { scripts?: Record<string, string> } = {}): Fixture {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `agentview-${name}-`));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `localhostfix-${name}-`));
   fs.writeFileSync(path.join(dir, 'server.mjs'), serverSource);
   fs.writeFileSync(
     path.join(dir, 'package.json'),
@@ -49,7 +49,7 @@ export function makeFixture(name: string, serverSource: string, extra: { scripts
  * Server source builder. `handler` is inlined into the fixture file, so it
  * must be self-contained JS. Port 0 lets the OS pick a free port, which the
  * server then advertises the way a real dev server does — exercising
- * AgentView's URL-from-logs discovery.
+ * LocalhostFix's URL-from-logs discovery.
  */
 export function serverSource(handler: string, opts: { announce?: string } = {}): string {
   return `import http from 'node:http';

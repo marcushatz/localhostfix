@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Command } from 'commander';
-import { agentviewDir, loadConfig } from '../config/config.js';
+import { localhostfixDir, loadConfig } from '../config/config.js';
 import { findProjectRoot } from '../project/discover.js';
 import { runInspection } from '../inspect/run.js';
 import { isFrontendFile } from './watch.js';
@@ -9,11 +9,11 @@ import { isFrontendFile } from './watch.js';
 /**
  * Hook runtime invoked by Claude Code:
  *
- *   agentview hook post-tool  — reads the PostToolUse JSON from stdin; when the
+ *   localhostfix hook post-tool  — reads the PostToolUse JSON from stdin; when the
  *     edited file is frontend-relevant, marks verification stale. Never launches
  *     a browser; must stay fast.
  *
- *   agentview hook stop — reads the Stop JSON from stdin; when verification is
+ *   localhostfix hook stop — reads the Stop JSON from stdin; when verification is
  *     stale, runs ONE inspection and clears the marker.
  *     Loop safety:
  *       - no stale marker → exit 0 immediately (nothing relevant changed)
@@ -32,7 +32,7 @@ export function registerHookCommand(program: Command): void {
     const filePath = extractFilePath(input);
     if (!filePath || !isFrontendFile(filePath)) return; // backend-only edits never mark stale
     const project = findProjectRoot(process.cwd());
-    const stateDir = path.join(agentviewDir(project.root), 'state');
+    const stateDir = path.join(localhostfixDir(project.root), 'state');
     fs.mkdirSync(stateDir, { recursive: true });
     fs.writeFileSync(path.join(stateDir, 'stale'), new Date().toISOString() + ' ' + filePath + '\n', { flag: 'a' });
   });
@@ -43,7 +43,7 @@ export function registerHookCommand(program: Command): void {
     const { config } = loadConfig(project.root);
     if (config.autoInspect === 'off') return;
 
-    const stateDir = path.join(agentviewDir(project.root), 'state');
+    const stateDir = path.join(localhostfixDir(project.root), 'state');
     const staleMarker = path.join(stateDir, 'stale');
     if (!fs.existsSync(staleMarker)) return; // nothing relevant changed
 
@@ -61,7 +61,7 @@ export function registerHookCommand(program: Command): void {
       const { report } = await runInspection({ cwd: project.root });
       const stopHookActive = Boolean((input as { stop_hook_active?: boolean }).stop_hook_active);
       const healthy = report.verdict === 'HEALTHY_RENDER';
-      const summary = `AgentView inspected ${report.url ?? 'the app'}: ${report.verdict}. Report: .agentview/latest/report.md, screenshots: .agentview/latest/desktop.png / mobile.png`;
+      const summary = `LocalhostFix inspected ${report.url ?? 'the app'}: ${report.verdict}. Report: .localhostfix/latest/report.md, screenshots: .localhostfix/latest/desktop.png / mobile.png`;
 
       if (config.autoInspect === 'enforced' && !healthy && !stopHookActive) {
         // Force one continuation so Claude sees the diagnosis. stop_hook_active
@@ -78,7 +78,7 @@ export function registerHookCommand(program: Command): void {
         emit({ systemMessage: summary });
       }
     } catch (err) {
-      emit({ systemMessage: `AgentView auto-inspection failed to run: ${err instanceof Error ? err.message : err}` });
+      emit({ systemMessage: `LocalhostFix auto-inspection failed to run: ${err instanceof Error ? err.message : err}` });
     } finally {
       fs.rmSync(lock, { force: true });
     }

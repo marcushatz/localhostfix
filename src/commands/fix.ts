@@ -118,9 +118,9 @@ export function printFixResult(r: FixResult): void {
         for (const e of report.evidence.slice(0, 8)) console.log(`    ${e.detail}`);
       }
       console.log('');
-      console.log('  AgentView made no source-code changes.');
+      console.log('  LocalhostFix made no source-code changes.');
       console.log('  Fix the application, then rerun:');
-      console.log('    agentview inspect');
+      console.log('    localhostfix inspect');
       break;
 
     case 'COULD_NOT_REPAIR':
@@ -130,7 +130,7 @@ export function printFixResult(r: FixResult): void {
         console.log(`  ${r.requiresApproval.action}:`);
         console.log(`    ${r.requiresApproval.command}`);
         console.log('');
-        console.log('  Or re-run with --yes to let AgentView do it.');
+        console.log('  Or re-run with --yes to let LocalhostFix do it.');
       }
       break;
   }
@@ -155,7 +155,7 @@ function describeApplicationFailure(verdict: string): string {
     case 'ROUTE_NOT_FOUND':
       return 'The requested route does not exist.';
     case 'AUTHENTICATION_GATE':
-      return 'The route is behind authentication. AgentView will not bypass it.';
+      return 'The route is behind authentication. LocalhostFix will not bypass it.';
     case 'PARTIAL_RENDER':
       return 'The application rendered with problems.';
     default:

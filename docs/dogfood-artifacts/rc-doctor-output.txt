@@ -1,12 +1,12 @@
 
-  AGENTVIEW DOCTOR
+  LOCALHOSTFIX DOCTOR
 
   Project
   ✓ Project root: /Users/example/project-a
   ✓ Framework: Next.js
   ✓ Package manager: npm
   ✓ Development command: npm run dev
-  ! No AgentView config yet (defaults in use) — run `agentview setup`
+  ! No LocalhostFix config yet (defaults in use) — run `localhostfix setup`
 
   Configured URL
   ! http://localhost:3000 (Next.js default — not configured)
@@ -24,15 +24,15 @@
   ! Configuration expects port 3000, but this project's server is on 3005
 
   Browser
-  ✓ Playwright package available (bundled with AgentView)
+  ✓ Playwright package available (bundled with LocalhostFix)
   ✓ Chromium executable: /Users/example/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
   ✓ Chromium launches successfully
 
   Claude integration
-  ! Project skill not installed — run `agentview setup --claude`
+  ! Project skill not installed — run `localhostfix setup --claude`
   ! Automatic verification hook not enabled
 
   Recommended actions
   1. The configured port is serving another project. Inspecting it would verify the wrong application.
-  2. Update AgentView configuration to port 3005 — run `agentview doctor --fix`.
+  2. Update LocalhostFix configuration to port 3005 — run `localhostfix doctor --fix`.
 

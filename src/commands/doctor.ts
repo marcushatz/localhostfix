@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import pc from 'picocolors';
 import type { Command } from 'commander';
-import { loadConfig, saveConfig } from '../config/config.js';
+import { legacyDirNotice, loadConfig, saveConfig } from '../config/config.js';
 import { findProjectRoot, detectPackageManager, runScriptCommand } from '../project/discover.js';
 import { adapterById, detectDevScript, detectFramework } from '../frameworks/adapter.js';
 import { ensureServer } from '../server/lifecycle.js';
@@ -34,12 +34,12 @@ export function registerDoctorCommand(program: Command): void {
   program
     .command('doctor')
     .description('Diagnose the full frontend-inspection chain without modifying anything')
-    .option('--fix', 'apply safe fixes (store detected port/URL in AgentView config)')
+    .option('--fix', 'apply safe fixes (store detected port/URL in LocalhostFix config)')
     .option('--no-server', 'skip starting the dev server (probe only)')
     .action(async (opts: { fix?: boolean; server?: boolean }) => {
       const result = await runDoctor({ cwd: process.cwd(), fix: opts.fix ?? false, startServer: opts.server !== false });
       console.log('');
-      console.log(pc.bold('  AGENTVIEW DOCTOR'));
+      console.log(pc.bold('  LOCALHOSTFIX DOCTOR'));
       for (const section of result.sections) {
         console.log('');
         console.log(pc.bold(`  ${section.title}`));
@@ -79,8 +79,8 @@ export async function runDoctor(opts: {
   const { config, source: configSource, error: configError } = loadConfig(project.root);
 
   if (!project.packageJson && !config.url && !config.devCommand) {
-    note(projectSection, 'fail', `No package.json found from ${opts.cwd} and no AgentView config`);
-    recommendations.push('Run `agentview setup` inside a Node.js project.');
+    note(projectSection, 'fail', `No package.json found from ${opts.cwd} and no LocalhostFix config`);
+    recommendations.push('Run `localhostfix setup` inside a Node.js project.');
     return { sections, recommendations, exitCode: 2 };
   }
   const adapter = adapterById(config.framework) ?? detectFramework(project.packageJson, project.root);
@@ -100,16 +100,19 @@ export async function runDoctor(opts: {
     note(projectSection, 'warn', 'No development command; relying on configured "url"');
   } else {
     note(projectSection, 'fail', 'No development command found (no dev/start/serve script)');
-    recommendations.push('Add a dev script to package.json or set "devCommand" in .agentview/config.json.');
+    recommendations.push('Add a dev script to package.json or set "devCommand" in .localhostfix/config.json.');
   }
 
+  const legacy = legacyDirNotice(project.root);
+  if (legacy) note(projectSection, 'warn', legacy);
+
   if (configError) {
-    note(projectSection, 'fail', `.agentview/config.json is invalid: ${configError.split('\n')[0]}`);
-    recommendations.push('Fix or delete .agentview/config.json, then re-run `agentview setup`.');
+    note(projectSection, 'fail', `.localhostfix/config.json is invalid: ${configError.split('\n')[0]}`);
+    recommendations.push('Fix or delete .localhostfix/config.json, then re-run `localhostfix setup`.');
   } else if (configSource) {
-    note(projectSection, 'ok', 'AgentView config: .agentview/config.json');
+    note(projectSection, 'ok', 'LocalhostFix config: .localhostfix/config.json');
   } else {
-    note(projectSection, 'warn', 'No AgentView config yet (defaults in use) — run `agentview setup`');
+    note(projectSection, 'warn', 'No LocalhostFix config yet (defaults in use) — run `localhostfix setup`');
   }
 
   // ── Configured URL ───────────────────────────────────────────────────
@@ -121,7 +124,7 @@ export async function runDoctor(opts: {
     note(configuredSection, config.url || config.expectedPort ? 'ok' : 'warn',
       `${configuredUrl}${config.url ? '' : config.expectedPort ? '' : ` (${adapter.displayName} default — not configured)`}`);
   } else {
-    note(configuredSection, 'warn', 'No URL or port configured; AgentView will discover one');
+    note(configuredSection, 'warn', 'No URL or port configured; LocalhostFix will discover one');
   }
 
   // ── Port ownership ───────────────────────────────────────────────────
@@ -137,9 +140,9 @@ export async function runDoctor(opts: {
 
   if (discovery.remoteUrlBlocked) {
     note(configuredSection, 'fail',
-      `${discovery.remoteUrlBlocked} is not a localhost URL — AgentView did not contact it`);
+      `${discovery.remoteUrlBlocked} is not a localhost URL — LocalhostFix did not contact it`);
     recommendations.push(
-      'AgentView inspects localhost only. Set a local "url", or pass --allow-remote if you understand that artifacts may then contain remote data.',
+      'LocalhostFix inspects localhost only. Set a local "url", or pass --allow-remote if you understand that artifacts may then contain remote data.',
     );
   }
 
@@ -147,7 +150,7 @@ export async function runDoctor(opts: {
   sections.push(ownershipSection);
   if (discovery.ownershipUnavailable) {
     note(ownershipSection, 'unknown',
-      'Process inspection unavailable on this system (lsof missing or restricted) — AgentView cannot verify which project owns a port');
+      'Process inspection unavailable on this system (lsof missing or restricted) — LocalhostFix cannot verify which project owns a port');
   } else if (discovery.foreignServers.length > 0) {
     for (const foreign of discovery.foreignServers) {
       note(ownershipSection, 'fail',
@@ -211,7 +214,7 @@ export async function runDoctor(opts: {
       recommendations.push('Fix the dev server startup error shown above.');
     } else {
       note(serverSection, 'fail', `Dev server did not become reachable within ${config.startupTimeoutMs}ms`);
-      recommendations.push('Increase "startupTimeoutMs" or set "url" explicitly in .agentview/config.json.');
+      recommendations.push('Increase "startupTimeoutMs" or set "url" explicitly in .localhostfix/config.json.');
     }
   } else if (!actualUrl && !discovery.ambiguous && !opts.startServer) {
     note(serverSection, 'unknown', 'No server running for this project; start skipped (--no-server)');
@@ -225,9 +228,9 @@ export async function runDoctor(opts: {
       note(serverSection, 'warn', `Configuration expects port ${expectedPort}, but this project's server is on ${actualPort}`);
       if (opts.fix) {
         saveConfig(project.root, { ...config, expectedPort: actualPort });
-        note(serverSection, 'ok', `Fixed: stored expectedPort ${actualPort} in .agentview/config.json (undo: edit the file)`);
+        note(serverSection, 'ok', `Fixed: stored expectedPort ${actualPort} in .localhostfix/config.json (undo: edit the file)`);
       } else {
-        recommendations.push(`Update AgentView configuration to port ${actualPort} — run \`agentview doctor --fix\`.`);
+        recommendations.push(`Update LocalhostFix configuration to port ${actualPort} — run \`localhostfix doctor --fix\`.`);
       }
     }
   }
@@ -235,7 +238,7 @@ export async function runDoctor(opts: {
   // ── Browser ──────────────────────────────────────────────────────────
   const browserSection: Section = { title: 'Browser', findings: [] };
   sections.push(browserSection);
-  note(browserSection, 'ok', 'Playwright package available (bundled with AgentView)');
+  note(browserSection, 'ok', 'Playwright package available (bundled with LocalhostFix)');
   const availability = checkBrowserInstalled();
   if (availability.installed) {
     note(browserSection, 'ok', `Chromium executable: ${availability.executablePath}`);
@@ -257,9 +260,9 @@ export async function runDoctor(opts: {
   sections.push(claudeSection);
   const claude = claudeIntegrationStatus(project.root);
   if (claude.skillInstalled) {
-    note(claudeSection, 'ok', 'Project skill installed (.claude/skills/agentview)');
+    note(claudeSection, 'ok', 'Project skill installed (.claude/skills/localhostfix)');
   } else {
-    note(claudeSection, 'warn', 'Project skill not installed — run `agentview setup --claude`');
+    note(claudeSection, 'warn', 'Project skill not installed — run `localhostfix setup --claude`');
   }
   if (claude.hookInstalled) {
     note(claudeSection, 'ok', `Automatic verification hook enabled in ${claude.hookLocation} (mode: ${config.autoInspect})`);
@@ -277,5 +280,5 @@ export async function runDoctor(opts: {
 export function doctorArtifactsDirIgnored(projectRoot: string): boolean {
   const gitignore = path.join(projectRoot, '.gitignore');
   if (!fs.existsSync(gitignore)) return false;
-  return fs.readFileSync(gitignore, 'utf8').includes('.agentview/runs');
+  return fs.readFileSync(gitignore, 'utf8').includes('.localhostfix/runs');
 }

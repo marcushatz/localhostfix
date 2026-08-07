@@ -1,8 +1,8 @@
-# AgentView — Product Specification (v0.1)
+# LocalhostFix — Product Specification (v0.1)
 
 ## One sentence
 
-AgentView verifies that a coding agent can actually inspect the frontend it is changing: it starts or finds the local dev server, opens the rendered app in Chromium, captures browser evidence, and explains which layer failed when inspection does not work.
+LocalhostFix verifies that a coding agent can actually inspect the frontend it is changing: it starts or finds the local dev server, opens the rendered app in Chromium, captures browser evidence, and explains which layer failed when inspection does not work.
 
 ## The problem
 
@@ -14,15 +14,15 @@ Coding agents (Claude Code and others) frequently edit frontends without reliabl
 4. The agent keeps editing based on source code alone and assumes the UI is fine.
 5. The developer opens a real browser and finds an obviously broken page, then manually debugs the whole chain (server? port? route? browser install? JS crash? failed API? auth wall?).
 
-AgentView replaces that manual debugging with one deterministic, evidence-producing command.
+LocalhostFix replaces that manual debugging with one deterministic, evidence-producing command.
 
-## What AgentView is
+## What LocalhostFix is
 
-- A CLI developer tool (`agentview setup | doctor | inspect | watch`).
+- A CLI developer tool (`localhostfix setup | doctor | inspect | watch`).
 - A reliability, diagnosis, artifact-generation, and agent-workflow layer **around** existing browser tooling (Playwright).
 - A project-level Claude Code integration (Skill + optional hook-based automatic verification).
 
-## What AgentView is not
+## What LocalhostFix is not
 
 - Not a replacement for Playwright or a new browser-automation framework.
 - Not an AI design critic. No AI/API key is needed for any core function.
@@ -58,13 +58,13 @@ AgentView replaces that manual debugging with one deterministic, evidence-produc
 
 | Command | Purpose |
 |---|---|
-| `agentview setup` | One-time project configuration; `--claude` installs the Claude Code integration |
-| `agentview doctor` | Diagnose the full inspection chain without modifying anything (`--fix` applies safe fixes) |
-| `agentview inspect [route]` | Run one full inspection and produce artifacts |
-| `agentview fix [route]` | Attempt safe recovery, then verify whether inspection works again |
-| `agentview watch` | Watch frontend files, debounce, re-run inspections |
-| `agentview status` | Show config, last run result, and integration state |
-| `agentview clean` | Remove AgentView-generated runs/state |
+| `localhostfix setup` | One-time project configuration; `--claude` installs the Claude Code integration |
+| `localhostfix doctor` | Diagnose the full inspection chain without modifying anything (`--fix` applies safe fixes) |
+| `localhostfix inspect [route]` | Run one full inspection and produce artifacts |
+| `localhostfix fix [route]` | Attempt safe recovery, then verify whether inspection works again |
+| `localhostfix watch` | Watch frontend files, debounce, re-run inspections |
+| `localhostfix status` | Show config, last run result, and integration state |
+| `localhostfix clean` | Remove LocalhostFix-generated runs/state |
 
 ## The layer model (central product idea)
 
@@ -89,9 +89,9 @@ Verdicts (see ARCHITECTURE.md for the full classification): PROJECT_NOT_RECOGNIZ
 Each inspection writes a timestamped run directory plus a `latest` pointer:
 
 ```
-.agentview/
+.localhostfix/
   config.json          # committed project config
-  state/               # AgentView-owned process metadata (gitignored)
+  state/               # LocalhostFix-owned process metadata (gitignored)
   runs/<timestamp>/    # gitignored
     report.md          # concise, agent-readable narrative
     report.json        # stable, documented schema for hooks/tools
@@ -107,15 +107,15 @@ Conservative, multi-signal, confidence-scored. Signals: main-document status, ti
 
 ## Safe automatic fixes (allowed)
 
-Store detected URL/port; install supported Chromium after explicit approval; create isolated browser profile; repair AgentView's own config/files/integration; wait longer for server readiness; headless fallback; remove stale AgentView-owned process metadata; terminate only processes AgentView itself started and positively identifies. Every fix records: what was wrong, what changed, success, and how to undo.
+Store detected URL/port; install supported Chromium after explicit approval; create isolated browser profile; repair LocalhostFix's own config/files/integration; wait longer for server readiness; headless fallback; remove stale LocalhostFix-owned process metadata; terminate only processes LocalhostFix itself started and positively identifies. Every fix records: what was wrong, what changed, success, and how to undo.
 
 **Never:** rewrite app source, kill unrelated processes, touch user browser profiles, modify global shell config or Claude global config, alter auth state, disable SSL, use sudo, or claim a setup fix repaired the application.
 
 ## Claude Code integration
 
-- **Project Skill** — teaches Claude: inspect before making frontend claims; run AgentView after frontend changes; read report + both screenshots + errors; never claim visual verification when inspection failed; distinguish setup failure from app failure.
+- **Project Skill** — teaches Claude: inspect before making frontend claims; run LocalhostFix after frontend changes; read report + both screenshots + errors; never claim visual verification when inspection failed; distinguish setup failure from app failure.
 - **Automatic verification (optional)** — debounced dirty-state model: frontend edits mark verification stale; one inspection runs at task-completion time (Stop hook); the report is fed back to Claude. Modes: `off` / `advisory` / `enforced` (default `advisory`). Loop-safe by design.
-- **MCP** — NOT IMPLEMENTED in v0.1. AgentView neither detects nor configures Playwright MCP. Its inspection has never required an MCP connection, which was the point of the architecture; helping configure MCP remains a possible future addition.
+- **MCP** — NOT IMPLEMENTED in v0.1. LocalhostFix neither detects nor configures Playwright MCP. Its inspection has never required an MCP connection, which was the point of the architecture; helping configure MCP remains a possible future addition.
 
 ## Privacy & security posture (v0.1)
 
@@ -123,7 +123,7 @@ Localhost-only by default; explicit override + warning for remote URLs; zero tel
 
 ## Naming note
 
-**Unresolved release blocker.** The npm name `agentview` is taken by a package that ships a CLI binary of the same name, the `@agentview` scope is owned by that same author (so the `@agentview/cli` placeholder can never be published), `github.com/agentview` is taken by a project in this category, and a ~3K-star tool called AgentsView occupies adjacent mindshare. Full evidence and recommendations in [NAMING.md](NAMING.md).
+**Resolved.** The product is **LocalhostFix**, renamed from the working name "AgentView" on 2026-08-07 before any public release. The npm package, CLI binary, and GitHub repository are all `localhostfix`, each verified available from the terminal. Evidence, and why the previous name was abandoned, in [NAMING.md](NAMING.md).
 
 ## Acceptance criteria
 

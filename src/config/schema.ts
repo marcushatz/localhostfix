@@ -8,11 +8,11 @@ export const ViewportSchema = z.object({
 export const ClaudeIntegrationMode = z.enum(['off', 'advisory', 'enforced']);
 
 /**
- * .agentview/config.json — project-level configuration.
+ * .localhostfix/config.json — project-level configuration.
  * Every field is optional; setup fills in what it detects and
  * inspect falls back to detection for anything missing.
  */
-export const AgentViewConfigSchema = z
+export const LocalhostFixConfigSchema = z
   .object({
     $schema: z.string().optional(),
     /** Dev server command, e.g. "npm run dev". Empty string means "no dev server; url must be set". */
@@ -48,7 +48,7 @@ export const AgentViewConfigSchema = z
   })
   .strict();
 
-export type AgentViewConfig = z.infer<typeof AgentViewConfigSchema>;
-export type AgentViewConfigInput = z.input<typeof AgentViewConfigSchema>;
+export type LocalhostFixConfig = z.infer<typeof LocalhostFixConfigSchema>;
+export type LocalhostFixConfigInput = z.input<typeof LocalhostFixConfigSchema>;
 
-export const DEFAULT_CONFIG: AgentViewConfig = AgentViewConfigSchema.parse({});
+export const DEFAULT_CONFIG: LocalhostFixConfig = LocalhostFixConfigSchema.parse({});

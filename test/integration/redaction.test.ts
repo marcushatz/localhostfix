@@ -11,7 +11,7 @@ import { makeFixture, serverSource, type Fixture } from '../fixtures/servers.js'
  * Adversarial redaction tests.
  *
  * The fixture page deliberately leaks obviously-fake secrets through every
- * channel AgentView records, then every generated artifact is scanned for
+ * channel LocalhostFix records, then every generated artifact is scanned for
  * them. A secret appearing anywhere in a run directory is a release blocker.
  */
 
@@ -19,13 +19,13 @@ const TIMEOUT = 120_000;
 
 /** Distinctive so a match cannot be coincidental. */
 const SECRETS = {
-  bearer: 'sk-live-AGENTVIEWSECRET-bearer-11111',
-  cookie: 'AGENTVIEWSECRET-cookie-22222',
-  apiKey: 'AGENTVIEWSECRET-apikey-33333',
-  queryToken: 'AGENTVIEWSECRET-querytoken-44444',
-  queryPassword: 'AGENTVIEWSECRET-password-55555',
-  responseBody: 'AGENTVIEWSECRET-responsebody-66666',
-  csrf: 'AGENTVIEWSECRET-csrf-77777',
+  bearer: 'sk-live-LOCALHOSTFIXSECRET-bearer-11111',
+  cookie: 'LOCALHOSTFIXSECRET-cookie-22222',
+  apiKey: 'LOCALHOSTFIXSECRET-apikey-33333',
+  queryToken: 'LOCALHOSTFIXSECRET-querytoken-44444',
+  queryPassword: 'LOCALHOSTFIXSECRET-password-55555',
+  responseBody: 'LOCALHOSTFIXSECRET-responsebody-66666',
+  csrf: 'LOCALHOSTFIXSECRET-csrf-77777',
 };
 
 const fixtures: Fixture[] = [];
@@ -80,8 +80,8 @@ describe('adversarial redaction', () => {
           if (content.includes(secret)) leaks.push(`${label} leaked into ${name}`);
         }
         // Nothing should be able to smuggle the marker through at all.
-        if (content.includes('AGENTVIEWSECRET')) {
-          const line = content.split('\n').find((l) => l.includes('AGENTVIEWSECRET'));
+        if (content.includes('LOCALHOSTFIXSECRET')) {
+          const line = content.split('\n').find((l) => l.includes('LOCALHOSTFIXSECRET'));
           leaks.push(`marker present in ${name}: ${line?.slice(0, 160)}`);
         }
       }
@@ -139,14 +139,14 @@ describe('adversarial redaction', () => {
     async () => {
       // Uses a TEST-NET-3 address (RFC 5737), which is guaranteed
       // unroutable, so a request would fail rather than reach anyone. The
-      // assertion is that AgentView reports it as blocked rather than
+      // assertion is that LocalhostFix reports it as blocked rather than
       // attempting it at all.
       const remote = 'http://203.0.113.10:8080';
       const fixture = makeFixture('remote-guard', serverSource(LEAKY_HANDLER));
       fixtures.push(fixture);
-      fs.mkdirSync(path.join(fixture.dir, '.agentview'), { recursive: true });
+      fs.mkdirSync(path.join(fixture.dir, '.localhostfix'), { recursive: true });
       fs.writeFileSync(
-        path.join(fixture.dir, '.agentview', 'config.json'),
+        path.join(fixture.dir, '.localhostfix', 'config.json'),
         JSON.stringify({ url: remote, allowRemote: false }),
       );
 
@@ -175,8 +175,8 @@ describe('adversarial redaction', () => {
       fixtures.push(fixture);
       const { runDir } = await runInspection({ cwd: fixture.dir });
 
-      // Artifacts live under .agentview/runs, which setup adds to .gitignore.
-      expect(runDir).toContain(path.join('.agentview', 'runs'));
+      // Artifacts live under .localhostfix/runs, which setup adds to .gitignore.
+      expect(runDir).toContain(path.join('.localhostfix', 'runs'));
     },
     TIMEOUT,
   );

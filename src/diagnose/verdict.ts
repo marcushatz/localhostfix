@@ -65,7 +65,7 @@ export const INSPECTION_LAYERS = [
 export type InspectionLayer = (typeof INSPECTION_LAYERS)[number];
 
 /**
- * Whether a verdict indicates the failure is in AgentView's domain
+ * Whether a verdict indicates the failure is in LocalhostFix's domain
  * (environment/setup) or the application's domain (the user's code).
  */
 export function verdictDomain(v: Verdict): 'setup' | 'application' | 'healthy' | 'unknown' {
