@@ -61,6 +61,7 @@ AgentView replaces that manual debugging with one deterministic, evidence-produc
 | `agentview setup` | One-time project configuration; `--claude` installs the Claude Code integration |
 | `agentview doctor` | Diagnose the full inspection chain without modifying anything (`--fix` applies safe fixes) |
 | `agentview inspect [route]` | Run one full inspection and produce artifacts |
+| `agentview fix [route]` | Attempt safe recovery, then verify whether inspection works again |
 | `agentview watch` | Watch frontend files, debounce, re-run inspections |
 | `agentview status` | Show config, last run result, and integration state |
 | `agentview clean` | Remove AgentView-generated runs/state |

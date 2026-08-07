@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { registerInspectCommand } from '../commands/inspect.js';
+import { registerFixCommand } from '../commands/fix.js';
 import { registerDoctorCommand } from '../commands/doctor.js';
 import { registerSetupCommand } from '../commands/setup.js';
 import { registerWatchCommand } from '../commands/watch.js';
@@ -21,6 +22,7 @@ program
 registerSetupCommand(program);
 registerDoctorCommand(program);
 registerInspectCommand(program);
+registerFixCommand(program);
 registerWatchCommand(program);
 registerStatusCommand(program);
 registerCleanCommand(program);

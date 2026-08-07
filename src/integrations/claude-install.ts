@@ -176,5 +176,21 @@ npx agentview doctor             # when inspection itself fails
 - HEALTHY_RENDER means the page rendered — not that it is visually correct. Judge correctness from the screenshots.
 - If \`likelyBlank\` is "uncertain", the page may be intentionally minimal — check the screenshot before concluding anything.
 - Exit codes: 0 healthy · 1 application problem · 2 setup problem · 3 indeterminate.
+
+## When inspection itself is broken
+
+Run \`npx agentview fix\`. It repairs only setup problems it owns (wrong stored
+port, server not running, stale state, corrupt AgentView config) and then
+re-inspects to verify. Its outcome tells you what to do:
+
+- \`FIXED\` / \`ALREADY_HEALTHY\` — inspection works; carry on and read the report.
+- \`APPLICATION_FIX_REQUIRED\` — the tooling is fine and YOUR CODE is broken. The
+  evidence you need is in the output and in \`.agentview/latest/\`. Fix the app,
+  then run \`npx agentview inspect\` again.
+- \`COULD_NOT_REPAIR\` — AgentView will not act safely here. Read the stated
+  reason; it names the next action (often \`--url\`, or a command to run).
+
+\`fix\` never edits source code. If it reports \`APPLICATION_FIX_REQUIRED\`, the
+repair is yours to make.
 `;
 }

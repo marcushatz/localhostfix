@@ -8,8 +8,8 @@ The brief asked for an explicit comparison of four possible foundations. Researc
 |---|---|---|
 | **1. Direct Playwright Node API** (`playwright-core`) | Library: launch browser, navigate, capture | **Chosen for the core engine** |
 | 2. Playwright's agent CLI (`npx playwright cli`, new in 1.62) | Stateful, session-oriented CLI that lets an agent drive a browser step by step | Not the core. Overlaps in primitives, differs in shape — see below |
-| 3. Playwright MCP (`npx playwright mcp` / `@playwright/mcp`) | MCP server exposing browser tools to agents | Optional, detected and validated — never required |
-| 4. Hybrid | Core on the Node API, plus MCP awareness | **Chosen overall** |
+| 3. Playwright MCP (`npx playwright mcp` / `@playwright/mcp`) | MCP server exposing browser tools to agents | Rejected as a dependency. **Not integrated at all in v0.1** — AgentView neither detects nor configures MCP |
+| 4. Hybrid | Core on the Node API, plus MCP awareness | Rejected for v0.1; MCP awareness was never built |
 
 ### Why the Node API is the core
 
@@ -59,20 +59,23 @@ src/
   config/        schema.ts (zod) + config.ts (load/save/merge)
   project/       project root, package manager, dev-script discovery
   frameworks/    FrameworkAdapter interface + next/vite/generic adapters
-  server/        lifecycle.ts (spawn/reuse/readiness), probe.ts, ownership.ts
+  platform/      ProcessInspector interface + posix/linux/unsupported impls
+  server/        discovery.ts (authoritative server identity), lifecycle.ts,
+                 probe.ts, ownership.ts
   browser/       driver.ts — install detection + Chromium launch
   inspect/       collect.ts (evidence gathering), run.ts (pipeline)
   diagnose/      verdict.ts (model), blank.ts (heuristic), diagnose.ts (mapping)
+  fixes/         engine.ts — safe recovery orchestration for `fix`
   artifacts/     report.ts (schema + markdown), write.ts (filesystem)
   security/      redact.ts
   integrations/  claude.ts (status), claude-install.ts (skill + hooks)
 ```
 
-Dependency direction is strictly one-way: `commands → inspect/diagnose → server/browser → project/config`. Nothing below `commands/` prints to stdout, so every layer is testable without capturing console output.
+Dependency direction is strictly one-way: `commands → fixes → inspect/diagnose → server/browser → platform/project/config`. Nothing below `commands/` prints to stdout, so every layer is testable without capturing console output.
 
 ### Adding a framework
 
-Implement `FrameworkAdapter` (detection predicate, dev-script candidates, default port, URL log patterns, error-overlay selectors, app-root selectors) and add it to the `ADAPTERS` array. No other file changes. Adding Windows/Linux support similarly touches only `server/ownership.ts` and `browser/driver.ts` cache paths.
+Implement `FrameworkAdapter` (detection predicate, dev-script candidates, default port, URL log patterns, error-overlay selectors, app-root selectors) and add it to the `ADAPTERS` array. No other file changes. Adding a platform means implementing `ProcessInspector` in `src/platform/` — see docs/PLATFORM_SUPPORT.md.
 
 ## The inspection pipeline
 
@@ -116,6 +119,30 @@ Multi-signal with confidence, deliberately biased against crying blank (see PROD
   - `Stop` runs at most one inspection when state is stale.
 - **Loop safety**, three independent mechanisms: no stale marker → immediate exit; `stop_hook_active` → never block twice in a turn; a lock file prevents concurrent inspections. The stale marker is cleared *before* the run so edits made during it correctly re-mark.
 - Existing settings are parsed and merged, never overwritten; a backup is written before the first edit; AgentView's own entries are tagged `agentview-hook` so they can be found and removed cleanly.
+
+## The fix command
+
+`agentview fix` is orchestration, not a second diagnostic engine. It calls
+`runInspection()` — the same path `inspect` uses — decides whether the verdict
+maps to a repair AgentView can make confidently, applies it, then calls
+`runInspection()` again and reports the *verified* result.
+
+Three constraints shape it:
+
+1. **It repairs only what AgentView owns.** Its own config, its own state
+   files, the port it stores, the timeout it waits, and (with explicit
+   approval) the browser build it depends on. Application source is never
+   touched, and a process AgentView did not start is never signalled.
+2. **Success requires verification.** `FIXED` is returned only when a fresh
+   inspection after the repair returns `HEALTHY_RENDER`. A test covers the case
+   where an infrastructure fix succeeds but the application then crashes: the
+   outcome is `APPLICATION_FIX_REQUIRED`, not `FIXED`.
+3. **Refusing is a valid outcome.** Ambiguous servers, foreign port owners, a
+   dev server that exits on startup, and non-localhost URLs are all reported
+   with a reason and a next action rather than guessed at.
+
+Every applied fix records what was wrong, what changed, whether it worked, and
+how to undo it.
 
 ## Deliberate non-goals for v0.1
 

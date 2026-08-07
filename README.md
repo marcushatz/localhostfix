@@ -137,6 +137,7 @@ agentview setup --claude     # detect the project, install the Claude Code skill
 agentview doctor             # check the whole chain
 agentview inspect            # inspect the default route
 agentview inspect /pricing   # inspect a specific route
+agentview fix                # when inspection is broken: repair what is safe, then verify
 ```
 
 Artifacts land in `.agentview/latest/` (and a timestamped directory under `.agentview/runs/`).
@@ -148,6 +149,7 @@ Artifacts land in `.agentview/latest/` (and a timestamped directory under `.agen
 | `agentview setup` | Detect framework, package manager, dev command, port; write `.agentview/config.json`; update `.gitignore` |
 | `agentview doctor` | Diagnose the chain without changing anything (`--fix` applies safe fixes) |
 | `agentview inspect [route]` | Run one inspection and write artifacts |
+| `agentview fix [route]` | Attempt safe recovery when inspection is broken, then verify whether it works again |
 | `agentview watch` | Re-inspect when frontend files change, debounced |
 | `agentview status` | Show config, integration state, and the last result |
 | `agentview clean` | Delete generated runs, artifacts, and state |
@@ -164,7 +166,7 @@ Useful flags: `--headed` (visible browser), `--json` (machine-readable report on
 |---|---|
 | `0` | Healthy render |
 | `1` | Application problem (crash, blank, failed API, missing route, auth gate) |
-| `2` | Setup/environment problem (server, port, browser, ambiguous servers) |
+| `2` | Setup/environment problem (server, port, browser, ambiguous servers, or `fix` could not repair) |
 | `3` | Indeterminate |
 | `4` | CLI usage error |
 
@@ -194,6 +196,84 @@ Optional automatic verification (`--auto advisory` or `--auto enforced`) adds tw
 So one task that touches twenty components produces one inspection, not twenty. Three independent mechanisms prevent loops: no stale marker means immediate exit, `stop_hook_active` means never block twice in a turn, and a lock file prevents concurrent runs. `advisory` never blocks; `enforced` blocks once with the diagnosis when the verdict is unhealthy. Disable with `agentview setup --auto off`.
 
 Hooks go to `.claude/settings.local.json` by default — personal and git-ignored — so installing AgentView never imposes a browser-launching hook on everyone who clones your repo. Existing settings are merged, never overwritten, and backed up first.
+
+## When inspection is broken: `agentview fix`
+
+Run one command when your coding agent cannot see localhost. AgentView fixes
+common setup failures, diagnoses the rest, and verifies that the real frontend
+is visible again.
+
+It uses the same discovery and diagnosis code as `doctor` and `inspect` — there
+is no second opinion — then applies only repairs it can make confidently, and
+**re-inspects to confirm**. A browser launching is not treated as success.
+
+```
+$ agentview fix
+
+  FIXED
+
+  ✓ Configuration expected port 3000, but this project's server is on 3210.
+    stored expectedPort 3210 in .agentview/config.json.
+
+  Project server found at http://localhost:3210.
+  Chromium launched. Application rendered.
+
+  Frontend inspection restored.
+```
+
+When the problem is your application, AgentView changes nothing and hands over
+the evidence needed to fix it:
+
+```
+$ agentview fix
+
+  APPLICATION_FIX_REQUIRED
+
+  Server and browser are healthy.
+  The application crashed during render.
+
+  Evidence:
+    Uncaught ReferenceError: userProfile is not defined
+    GET http://localhost:3210/api/profile → 500
+
+  AgentView made no source-code changes.
+  Fix the application, then rerun:
+    agentview inspect
+```
+
+And when it cannot repair something safely, it says so rather than guessing:
+
+```
+$ agentview fix
+
+  COULD_NOT_REPAIR
+
+  Chromium is missing. Safe automatic installation requires user approval.
+
+  Install the supported Chromium build:
+    npx playwright install chromium
+
+  Or re-run with --yes to let AgentView do it.
+```
+
+### What it repairs, and what it only diagnoses
+
+| Repairs automatically | Diagnoses only |
+|---|---|
+| A wrong stored port | Application crashes, blank renders, failed APIs, missing routes |
+| A dev server that is not running (starts the configured command) | A dev server that exits on startup |
+| A dev server that needs longer to become ready | A port held by a process AgentView did not start |
+| A corrupt `.agentview/config.json` (backed up, then regenerated) | Several project servers with no clear dev server |
+| A stale inspection lock from a crashed run | A missing dev command |
+| A missing Chromium build — **only with `--yes`** | A non-localhost configured URL |
+
+Outcomes are `ALREADY_HEALTHY`, `FIXED`, `APPLICATION_FIX_REQUIRED`, or
+`COULD_NOT_REPAIR`, with exit codes 0, 0, 1, and 2. `FIXED` is reported only
+when a fresh inspection after the repair actually rendered the application.
+
+AgentView will not rewrite your source code, signal a process it did not start,
+delete browser profiles, bypass authentication, touch global shell
+configuration, use `sudo`, or disable a privacy guard to make a run succeed.
 
 ## How it works
 
@@ -268,7 +348,7 @@ npm run test:integration  # real dev servers and real Chromium
 npm run typecheck
 ```
 
-95 tests across unit, integration, and hook end-to-end coverage. Integration tests start real dev servers and launch real Chromium against fixture projects in temporary directories; the wrong-project suite spawns real child processes with explicit working directories to prove server identity works. No test touches an external website.
+108 tests across unit, integration, and hook end-to-end coverage. Integration tests start real dev servers and launch real Chromium against fixture projects in temporary directories; the wrong-project suite spawns real child processes with explicit working directories to prove server identity works. No test touches an external website.
 
 ## Contributing
 

@@ -9,6 +9,24 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
 
 ## [Unreleased]
 
+### Added — `agentview fix` (2026-08-07)
+
+- New command that attempts safe recovery of frontend inspection and then
+  **verifies** whether it works again. It reuses the discovery and diagnosis
+  code behind `doctor` and `inspect`; there is no parallel logic.
+- Repairs automatically: a wrong stored port, a dev server that is not running,
+  a dev server needing longer to become ready, a corrupt `.agentview/config.json`
+  (backed up before regeneration), and a stale inspection lock from a crashed run.
+- Requires explicit approval (`--yes`) before installing the Chromium build.
+- Diagnoses without acting: application crashes, blank renders, failed APIs,
+  a dev server that exits on startup, a port held by a foreign process, several
+  ambiguous project servers, a missing dev command, and a non-localhost URL.
+- Outcomes `ALREADY_HEALTHY` / `FIXED` / `APPLICATION_FIX_REQUIRED` /
+  `COULD_NOT_REPAIR` with exit codes 0/0/1/2. `FIXED` is reported only when a
+  fresh inspection after the repair actually rendered the application.
+- Never modifies application source, signals a process it did not start, or
+  disables a privacy guard to make a run succeed.
+
 ### Changed — pre-release hardening (2026-08-07)
 
 - `doctor` and `inspect` now share one authoritative server-discovery module.
@@ -62,7 +80,7 @@ follows [Semantic Versioning](https://semver.org/). While the major version is
   bodies are never stored.
 - Claude Code project skill plus optional loop-safe automatic verification
   hooks, installed to `.claude/settings.local.json` by default.
-- 95 tests spanning unit, integration, and hook end-to-end coverage.
+- 108 tests spanning unit, integration, and hook end-to-end coverage.
 - GitHub Actions CI with three tiers that do not pretend to be each other:
   code compatibility, browser integration, and OS-specific server discovery.
 - `docs/PLATFORM_SUPPORT.md` (Verified/Expected/Untested/Unsupported per
